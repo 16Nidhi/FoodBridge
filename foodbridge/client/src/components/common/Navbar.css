@@ -144,8 +144,17 @@
   background: rgba(16,185,129,0.08);
 }
 
+.fb-nav.scrolled {
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 4px 32px rgba(2,6,23,0.10);
+}
+
+/* Animated hamburger → X */
+.fb-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.fb-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.fb-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
 @media (max-width: 768px) {
-  .fb-links { display: none; }
   .fb-actions { display: none; }
   .fb-toggle { display: flex; }
   .fb-links.open {
