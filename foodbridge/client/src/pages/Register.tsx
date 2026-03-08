@@ -1,80 +1,72 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { registerUser } from '../store/slices/authSlice';
-import { useNavigate } from 'react-router-dom';
+import { login } from '../store/slices/authSlice';
+import './Login.css';
 
-const Register = () => {
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-    });
-    const [error, setError] = useState('');
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
+const Register: React.FC = () => {
+  const [form, setForm] = useState({ name:'', email:'', password:'', confirmPassword:'', role:'donor' });
+  const [error, setError] = useState('');
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-    const { name, email, password, confirmPassword } = formData;
+  const handle = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    dispatch(login({ id: Date.now().toString(), name: form.name, role: form.role }));
+    navigate('/dashboard');
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (password !== confirmPassword) {
-            setError('Passwords do not match');
-            return;
-        }
-        try {
-            await dispatch(registerUser({ name, email, password })).unwrap();
-            navigate('/dashboard');
-        } catch (err) {
-            setError(err.message);
-        }
-    };
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-brand">🌿 FoodBridge</div>
+        <h2 className="auth-title">Create account</h2>
+        <p className="auth-subtitle">Join the food rescue movement</p>
 
-    return (
-        <div className="register-container">
-            <h2>Register</h2>
-            {error && <p className="error">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    name="name"
-                    value={name}
-                    onChange={handleChange}
-                    placeholder="Name"
-                    required
-                />
-                <input
-                    type="email"
-                    name="email"
-                    value={email}
-                    onChange={handleChange}
-                    placeholder="Email"
-                    required
-                />
-                <input
-                    type="password"
-                    name="password"
-                    value={password}
-                    onChange={handleChange}
-                    placeholder="Password"
-                    required
-                />
-                <input
-                    type="password"
-                    name="confirmPassword"
-                    value={confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Confirm Password"
-                    required
-                />
-                <button type="submit">Register</button>
-            </form>
-        </div>
-    );
+        {error && <div className="auth-error">{error}</div>}
+
+        <form onSubmit={handleSubmit}>
+          <div className="auth-field">
+            <label>Full Name</label>
+            <input name="name" type="text" value={form.name} onChange={handle} placeholder="Your name" required />
+          </div>
+          <div className="auth-field">
+            <label>Email address</label>
+            <input name="email" type="email" value={form.email} onChange={handle} placeholder="you@example.com" required autoComplete="email" />
+          </div>
+          <div className="auth-field">
+            <label>I am a…</label>
+            <select name="role" value={form.role} onChange={handle}>
+              <option value="donor">🍽️ Food Donor (Restaurant / Individual)</option>
+              <option value="volunteer">🚴 Volunteer</option>
+              <option value="ngo">🏢 NGO / Shelter</option>
+            </select>
+          </div>
+          <div className="auth-field">
+            <label>Password</label>
+            <input name="password" type="password" value={form.password} onChange={handle} placeholder="••••••••" required autoComplete="new-password" />
+          </div>
+          <div className="auth-field">
+            <label>Confirm Password</label>
+            <input name="confirmPassword" type="password" value={form.confirmPassword} onChange={handle} placeholder="••••••••" required autoComplete="new-password" />
+          </div>
+          <button type="submit" className="auth-submit">🌱 Create Account</button>
+        </form>
+
+        <p className="auth-footer">
+          Already have an account? <Link to="/login">Sign In</Link>
+        </p>
+      </div>
+    </div>
+  );
 };
 
 export default Register;

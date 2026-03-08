@@ -5,6 +5,7 @@
   "description": "A platform to reduce food waste by connecting restaurants, hostels, event organizers, and households with NGOs and volunteers.",
   "main": "src/main.tsx",
   "scripts": {
+    "dev": "vite",
     "start": "vite",
     "build": "vite build",
     "serve": "vite preview",

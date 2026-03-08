@@ -1,14 +1,95 @@
-/* Global reset & base styles */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ======================================
+   FoodBridge App Global Styles
+   Modern SaaS design system — Poppins + Inter
+   Primary: #10B981 | Secondary: #2563EB
+   Accent: #F97316 | Background: #F8FAFC
+   ====================================== */
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #F8FAFC;
-  color: #1E293B;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+:root{
+  --c-primary:#10B981;
+  --c-primary-dk:#059669;
+  --c-secondary:#2563EB;
+  --c-accent:#F97316;
+  --c-bg:#F8FAFC;
+  --c-card:#ffffff;
+  --c-border:#E6EEF8;
+  --c-text:#0F172A;
+  --c-muted:#64748B;
+  --ff-head: 'Poppins', sans-serif;
+  --ff-body: 'Inter', sans-serif;
+  --r-sm:8px; --r-md:14px; --r-lg:20px;
+  --sh-sm:0 4px 18px rgba(2,6,23,0.06);
+  --tr:0.28s cubic-bezier(.4,0,.2,1);
+  --max-w:1200px;
 }
 
-a { color: inherit; text-decoration: none; }
-button { cursor: pointer; font-family: inherit; border: none; background: none; }
-img { max-width: 100%; height: auto; display: block; }
+* ,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:var(--ff-body);
+  background:var(--c-bg);
+  color:var(--c-text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+img{max-width:100%;display:block;height:auto}
+a{color:inherit;text-decoration:none}
+
+/* Utility container */
+.container{max-width:var(--max-w);margin:0 auto;padding:0 20px}
+
+/* ===== NAVBAR ===== */
+.app .navbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0;background:transparent}
+.app .nav-left{display:flex;align-items:center;gap:14px}
+.nav-brand{font-family:var(--ff-head);font-weight:800;color:var(--c-primary);font-size:1.25rem}
+.nav-links{display:flex;gap:12px;align-items:center}
+.nav-links a{padding:8px 12px;border-radius:9999px;color:var(--c-muted);font-weight:600}
+.nav-links a:hover{background:rgba(16,185,129,0.06);color:var(--c-primary);transform:translateY(-1px)}
+.nav-actions{display:flex;gap:10px;align-items:center}
+
+/* ===== HERO (Home) ===== */
+.hero{padding:100px 0 64px;background:linear-gradient(135deg,#ECFDF5 0%, #FFF 100%)}
+.hero-inner{display:grid;grid-template-columns:1fr 480px;gap:48px;align-items:center}
+.hero-title{font-family:var(--ff-head);font-size:2.2rem;font-weight:800;margin-bottom:12px}
+.hero-sub{color:var(--c-muted);font-size:1rem;line-height:1.7;margin-bottom:20px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero-visual{background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(37,99,235,0.04));padding:26px;border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:9999px;font-weight:700;cursor:pointer;transition:all var(--tr)}
+.btn-primary{background:linear-gradient(90deg,var(--c-primary),var(--c-primary-dk));color:#fff;box-shadow:0 8px 30px rgba(16,185,129,0.18)}
+.btn-primary:hover{transform:translateY(-3px)}
+.btn-secondary{background:linear-gradient(90deg,var(--c-secondary),#1D4ED8);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--c-border);color:var(--c-text)}
+
+/* ===== CARDS ===== */
+.card{background:var(--c-card);border-radius:var(--r-md);box-shadow:var(--sh-sm);border:1px solid var(--c-border);padding:18px}
+.card-hero{padding:28px;border-radius:var(--r-lg)}
+
+/* ===== FEATURES GRID ===== */
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:30px}
+.feature{background:var(--c-card);padding:20px;border-radius:12px;border:1px solid var(--c-border);transition:all var(--tr)}
+.feature:hover{transform:translateY(-6px);box-shadow:0 18px 50px rgba(2,6,23,0.06)}
+.feature .title{font-family:var(--ff-head);font-weight:700;margin-bottom:8px}
+.feature p{color:var(--c-muted);font-size:0.95rem}
+
+/* ===== FOOTER ===== */
+.site-footer{background:#071124;color:#9AA9B9;padding:48px 0;margin-top:48px}
+.site-footer .row{display:flex;gap:40px}
+.site-footer a{color:#AFC9EB}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:900px){
+  .hero-inner{grid-template-columns:1fr}
+  .features{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:600px){
+  .nav-links{display:none}
+  .features{grid-template-columns:1fr}
+}
+
+/* small helpers */
+.muted{color:var(--c-muted)}
+.center{text-align:center}
+
