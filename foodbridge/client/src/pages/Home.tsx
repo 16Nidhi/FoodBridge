@@ -26,10 +26,10 @@ const testimonials = [
   { name: "Ananya Singh", role: "Volunteer",                 text: "My weekend pickups feel meaningful. The map UI is so smooth — I can do 3 pickups in 2 hours easily.", avatar: "🧑‍🤝‍🧑" },
 ];
 
-function Counter({ target, suffix }) {
+function Counter({ target, suffix }: { target: number; suffix: string }) {
   const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const started = useRef(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const started = useRef<boolean>(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -52,7 +52,7 @@ function Counter({ target, suffix }) {
     return () => observer.disconnect();
   }, [target]);
 
-  return React.createElement("div", { ref, className: "counter-num" }, count.toLocaleString() + suffix);
+  return <div ref={ref} className="counter-num">{count.toLocaleString() + suffix}</div>;
 }
 
 const Home = () => {

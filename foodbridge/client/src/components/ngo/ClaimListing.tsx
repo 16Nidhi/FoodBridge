@@ -3,12 +3,12 @@ import { useDispatch } from 'react-redux';
 import { claimFoodListing } from '../../store/slices/listingSlice';
 import { useParams } from 'react-router-dom';
 
-const ClaimListing = () => {
-    const { listingId } = useParams();
+const ClaimListing: React.FC = () => {
+    const { listingId } = useParams<{ listingId?: string }>();
     const dispatch = useDispatch();
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [listing, setListing] = useState(null);
+    const [error, setError] = useState<string | null>(null);
+    const [listing, setListing] = useState<any>(null);
 
     useEffect(() => {
         const fetchListing = async () => {
@@ -19,8 +19,8 @@ const ClaimListing = () => {
                 }
                 const data = await response.json();
                 setListing(data);
-            } catch (err) {
-                setError(err.message);
+            } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : String(err));
             } finally {
                 setLoading(false);
             }
@@ -30,7 +30,8 @@ const ClaimListing = () => {
     }, [listingId]);
 
     const handleClaim = () => {
-        dispatch(claimFoodListing(listingId));
+        if (!listingId) return;
+        dispatch(claimFoodListing(listingId as string));
     };
 
     if (loading) return <div>Loading...</div>;

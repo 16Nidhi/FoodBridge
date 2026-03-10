@@ -643,6 +643,52 @@ const NgoDashboard: React.FC = () => {
               </div>
             </>
           )}
+
+          {/* ════ STATISTICS ════ */}
+          {tab==='statistics' && (
+            <>
+              <div className="db-page-header">
+                <h2>NGO Statistics</h2>
+                <p>Detailed analytics on food received, distributed, and impact created</p>
+              </div>
+
+              <div className="db-stats-row">
+                {[
+                  { ico:'fa-inbox',          bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:'532 kg',  lbl:'Total Food Received',  delta:'+18% this month' },
+                  { ico:'fa-people-group',   bg:'rgba(37,99,235,0.1)',  color:'var(--c-secondary)', num:1240,      lbl:'People Fed',           delta:'All time' },
+                  { ico:'fa-truck-fast',     bg:'rgba(249,115,22,0.1)', color:'var(--c-accent)',    num:47,        lbl:'Total Deliveries',     delta:'Completed' },
+                  { ico:'fa-person-biking',  bg:'rgba(139,92,246,0.1)', color:'#8B5CF6',            num:12,        lbl:'Volunteer Partners',   delta:'Active this month' },
+                ].map((s, i) => (
+                  <div className="db-stat-chip" key={i}>
+                    <div className="db-stat-ico" style={{ background:s.bg }}>
+                      <i className={`fas ${s.ico}`} style={{ color:s.color }}></i>
+                    </div>
+                    <div>
+                      <div className="db-stat-num">{s.num}</div>
+                      <div className="db-stat-lbl">{s.lbl}</div>
+                      <div className="db-stat-delta delta-up">{s.delta}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="db-chart-row">
+                <div className="db-card db-chart-card">
+                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-line"></i> Monthly Food Flow (kg)</div></div>
+                  <div className="db-card-body"><div style={{ height:260 }}><Line data={lineData} options={lineOpts} /></div></div>
+                </div>
+                <div className="db-card db-chart-card db-chart-card--sm">
+                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-pie"></i> Distribution Categories</div></div>
+                  <div className="db-card-body"><div style={{ height:240 }}><Doughnut data={doughnutData} options={doughnutOpts} /></div></div>
+                </div>
+              </div>
+
+              <div className="db-card" style={{ marginTop:24 }}>
+                <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-bar"></i> Beneficiaries Fed per Month</div></div>
+                <div className="db-card-body"><div style={{ height:220 }}><Bar data={barData} options={barOpts} /></div></div>
+              </div>
+            </>
+          )}
         </div>
       </main>
 

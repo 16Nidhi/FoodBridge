@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 
-const FoodListingForm = () => {
+const FoodListingForm: React.FC = () => {
     const [foodName, setFoodName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [description, setDescription] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         // Logic to handle form submission, e.g., API call to submit food listing
     };

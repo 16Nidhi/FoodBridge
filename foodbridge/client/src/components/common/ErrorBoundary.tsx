@@ -3,20 +3,20 @@ import React from 'react';
 interface State {
   hasError: boolean;
   error: Error | null;
-  info: any;
+  info: React.ErrorInfo | null;
 }
 
-class ErrorBoundary extends React.Component<{}, State> {
+class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, State> {
   constructor(props: {}) {
     super(props);
     this.state = { hasError: false, error: null, info: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): Partial<State> | null {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: any) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Log to console — developer can see stacktrace
     console.error('Captured error in ErrorBoundary:', error, info);
     this.setState({ info });

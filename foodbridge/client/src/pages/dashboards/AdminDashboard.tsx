@@ -15,12 +15,26 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 /* ─── Types ─────────────────────────────────────────────────── */
 type UserRole   = 'donor' | 'ngo' | 'volunteer' | 'admin';
 type UserStatus = 'active' | 'inactive' | 'suspended';
+type NgoApprovalStatus = 'pending' | 'approved' | 'rejected';
+type DeliveryStatus = 'assigned' | 'picked_up' | 'en_route' | 'delivered' | 'cancelled';
 
 interface AppUser {
   id: string; name: string; email: string; role: UserRole;
   joinDate: string; status: UserStatus;
   donations?: number; pickups?: number;
   location: string;
+}
+
+interface NgoRegistration {
+  id: string; orgName: string; contactName: string; email: string;
+  phone: string; location: string; description: string;
+  appliedDate: string; approvalStatus: NgoApprovalStatus;
+}
+
+interface PlatformDelivery {
+  id: string; item: string; donor: string; ngo: string;
+  volunteer: string; quantity: string; date: string;
+  status: DeliveryStatus;
 }
 
 /* ─── Mock data ─────────────────────────────────────────────── */
@@ -37,12 +51,35 @@ const MOCK_USERS: AppUser[] = [
   { id:'10',name:'Sunita Patel',      email:'sunita@gmail.com',   role:'volunteer', joinDate:'2026-03-01', status:'active',    pickups:4,    location:'Pune' },
 ];
 
+const MOCK_NGO_REGISTRATIONS: NgoRegistration[] = [
+  { id:'n1', orgName:'Hope Feeds',         contactName:'Arun Kumar',    email:'arun@hopefeeds.org',    phone:'+91-9812345678', location:'Hyderabad', description:'Distributing food to urban poor families across Hyderabad.', appliedDate:'2026-03-07', approvalStatus:'pending' },
+  { id:'n2', orgName:'Nourish India',      contactName:'Meera Joshi',   email:'meera@nourishindia.in', phone:'+91-9723456789', location:'Pune',      description:'Community kitchen serving 200+ meals daily to homeless.', appliedDate:'2026-03-06', approvalStatus:'pending' },
+  { id:'n3', orgName:'FoodCare Trust',     contactName:'Sanjay Desai',  email:'info@foodcare.org',     phone:'+91-9634567890', location:'Surat',     description:'Food redistribution NGO working with local temples.', appliedDate:'2026-03-05', approvalStatus:'approved' },
+  { id:'n4', orgName:'Helping Hands NGO',  contactName:'Lakshmi Nair',  email:'lnair@helpinghands.in', phone:'+91-9545678901', location:'Kochi',     description:'Providing meals to elderly care homes and orphanages.', appliedDate:'2026-03-04', approvalStatus:'rejected' },
+];
+
+const MOCK_DELIVERIES: PlatformDelivery[] = [
+  { id:'del1', item:'Cooked Biryani',  donor:'Sunshine Hotel',  ngo:'Green Hope Trust', volunteer:'Ananya Verma', quantity:'25 kg',       date:'2026-03-09', status:'en_route' },
+  { id:'del2', item:'Fresh Bread',     donor:'City Bakery',     ngo:'Priya Singh',      volunteer:'Raj Kumar',    quantity:'10 kg',       date:'2026-03-09', status:'delivered' },
+  { id:'del3', item:'Mixed Vegetables',donor:'Fresh Mart',      ngo:'Feeding India',    volunteer:'Karan Mehta',  quantity:'15 kg',       date:'2026-03-09', status:'picked_up' },
+  { id:'del4', item:'Dal & Rice',      donor:'Hotel Grandeur',  ngo:'Green Hope Trust', volunteer:'Sunita Patel', quantity:'30 servings', date:'2026-03-08', status:'delivered' },
+  { id:'del5', item:'Fruit Platter',   donor:'Grand Catering',  ngo:'Priya Singh',      volunteer:'Arjun Mehta',  quantity:'8 kg',        date:'2026-03-08', status:'assigned' },
+  { id:'del6', item:'Dairy Products',  donor:'Amul Booth',      ngo:'Feeding India',    volunteer:'Raj Kumar',    quantity:'20 litres',   date:'2026-03-07', status:'delivered' },
+  { id:'del7', item:'Packaged Biscuits',donor:'Parle Foods',    ngo:'Green Hope Trust', volunteer:'Ananya Verma', quantity:'50 boxes',    date:'2026-03-07', status:'cancelled' },
+];
+
 const MONTHS = ['Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
 
 const ROLE_BADGE: Record<UserRole,string>     = { donor:'badge-green', ngo:'badge-blue', volunteer:'badge-orange', admin:'badge-red' };
 const STATUS_BADGE: Record<UserStatus,string> = { active:'badge-green', inactive:'badge-gray', suspended:'badge-red' };
+const DELIVERY_STATUS_BADGE: Record<DeliveryStatus,string> = {
+  assigned:'badge-gray', picked_up:'badge-orange', en_route:'badge-blue', delivered:'badge-green', cancelled:'badge-red',
+};
+const NGO_APPROVAL_BADGE: Record<NgoApprovalStatus,string> = {
+  pending:'badge-orange', approved:'badge-green', rejected:'badge-red',
+};
 
-type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users';
+type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users' | 'deliveries' | 'analytics';
 
 /* ═══════════════════════════════════════════════════════════════
    ADMIN DASHBOARD PAGE
@@ -55,16 +92,25 @@ const AdminDashboard: React.FC = () => {
   const [tab, setTab]             = useState<Tab>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers]         = useState<AppUser[]>(MOCK_USERS);
+  const [ngoRegistrations, setNgoRegistrations] = useState<NgoRegistration[]>(MOCK_NGO_REGISTRATIONS);
+  const [deliveries]              = useState<PlatformDelivery[]>(MOCK_DELIVERIES);
   const [roleFilter, setRoleFilter] = useState<'all'|UserRole>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [toastMsg, setToastMsg]   = useState<string | null>(null);
 
   const displayName = user?.name || 'Admin';
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'AD';
 
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const handleLogout = () => { dispatch(logout()); navigate('/login'); };
 
   const handleStatusChange = (id: string, status: UserStatus) =>
     setUsers(prev => prev.map(u => u.id===id ? {...u, status} : u));
+
+  const handleNgoApproval = (id: string, status: NgoApprovalStatus) => {
+    setNgoRegistrations(prev => prev.map(r => r.id===id ? {...r, approvalStatus:status} : r));
+    showToast(status === 'approved' ? 'NGO registration approved!' : 'NGO registration rejected.');
+  };
 
   /* Computed */
   const donors     = users.filter(u => u.role==='donor');
@@ -74,15 +120,13 @@ const AdminDashboard: React.FC = () => {
 
   const totalDonations = donors.reduce((a,u) => a + (u.donations||0), 0);
   const totalPickups   = volunteers.reduce((a,u) => a + (u.pickups||0), 0);
+  const pendingNgos    = ngoRegistrations.filter(r => r.approvalStatus === 'pending').length;
+  const totalDeliveries = deliveries.length;
+  const completedDeliveries = deliveries.filter(d => d.status === 'delivered').length;
 
   const filteredUsers = users
     .filter(u => roleFilter==='all' || u.role===roleFilter)
     .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  /* Tab-specific user sets */
-  const tabUsers: Record<Tab, AppUser[]> = {
-    overview: users, donors, volunteers, ngos, users,
-  };
 
   /* ── Charts ── */
   const lineData = {
@@ -207,15 +251,18 @@ const AdminDashboard: React.FC = () => {
           <div className="db-nav-section">
             <div className="db-nav-label">Admin Menu</div>
             {([
-              ['overview',   'fa-chart-line',   'Platform Overview'],
+              ['overview',   'fa-chart-line',   'Dashboard'],
+              ['users',      'fa-users',        'All Users'],
               ['donors',     'fa-box-open',     'Donors'],
               ['volunteers', 'fa-motorcycle',   'Volunteers'],
               ['ngos',       'fa-building',     'NGOs'],
-              ['users',      'fa-users',        'All Users'],
+              ['deliveries', 'fa-truck-fast',   'Deliveries'],
+              ['analytics',  'fa-chart-bar',    'Analytics'],
             ] as [Tab,string,string][]).map(([t,icon,label]) => (
               <button key={t} className={`db-nav-item${tab===t?' active':''}`}
                 onClick={() => { setTab(t); setSidebarOpen(false); }}>
                 <i className={`fas ${icon}`}></i> {label}
+                {t==='ngos' && pendingNgos>0 && <span className="notif-badge"></span>}
               </button>
             ))}
           </div>
@@ -245,11 +292,13 @@ const AdminDashboard: React.FC = () => {
               <i className="fas fa-bars"></i>
             </button>
             <div className="db-topbar-title">
-              {tab==='overview'   && '📊 Platform Overview'}
+              {tab==='overview'   && '📊 Admin Dashboard'}
+              {tab==='users'      && '👥 All Users'}
               {tab==='donors'     && '🍽️ Donor Management'}
               {tab==='volunteers' && '🚴 Volunteer Management'}
               {tab==='ngos'       && '🏢 NGO Management'}
-              {tab==='users'      && '👥 All Users'}
+              {tab==='deliveries' && '🚚 Delivery Monitoring'}
+              {tab==='analytics'  && '📈 Platform Analytics'}
             </div>
           </div>
           <div className="db-topbar-right">
@@ -272,10 +321,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row">
                 {[
-                  { ico:'fa-box-open',     bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:totalDonations,    lbl:'Total Donations',   delta:'All time' },
-                  { ico:'fa-users',        bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:activeCount,       lbl:'Active Users',      delta:'Currently online' },
-                  { ico:'fa-motorcycle',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:volunteers.length, lbl:'Volunteers',        delta:totalPickups + ' total pickups' },
-                  { ico:'fa-building',     bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:ngos.length,       lbl:'NGOs',              delta:'Registered partners' },
+                  { ico:'fa-users',        bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:users.length,      lbl:'Total Users',       delta:activeCount + ' active' },
+                  { ico:'fa-box-open',     bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:totalDonations,    lbl:'Total Donations',   delta:'All food listed' },
+                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:totalDeliveries,   lbl:'Total Deliveries',  delta:completedDeliveries + ' completed' },
+                  { ico:'fa-seedling',     bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:'532 kg',          lbl:'Food Rescued',      delta:'Saved from waste' },
                 ].map((s, i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -290,9 +339,29 @@ const AdminDashboard: React.FC = () => {
                 ))}
               </div>
 
+              {/* Pending NGO registrations alert */}
+              {pendingNgos > 0 && (
+                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(249,115,22,0.3)', background:'rgba(255,247,237,0.8)' }}>
+                  <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(249,115,22,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <i className="fas fa-clock" style={{ color:'var(--c-accent)', fontSize:'1.1rem' }}></i>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'#92400E' }}>{pendingNgos} Pending NGO Registration{pendingNgos>1?'s':''}</div>
+                        <div style={{ fontSize:'0.82rem', color:'#B45309' }}>Review and approve/reject NGO applications</div>
+                      </div>
+                    </div>
+                    <button className="db-btn db-btn-sm" style={{ background:'#F97316', color:'#fff' }} onClick={() => setTab('ngos')}>
+                      Review Now <i className="fas fa-arrow-right"></i>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Platform growth line chart */}
               <div className="db-card" style={{ marginBottom:24 }}>
-                <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-line"></i> Platform Growth</div></div>
+                <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-line"></i> Monthly Donations & Meals Saved</div></div>
                 <div className="db-card-body"><div style={{ height:260 }}><Line data={lineData} options={lineOpts} /></div></div>
               </div>
 
@@ -305,7 +374,7 @@ const AdminDashboard: React.FC = () => {
 
                 {/* Role doughnut */}
                 <div className="db-card db-chart-card db-chart-card--sm">
-                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-pie"></i> User Roles</div></div>
+                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-pie"></i> Active Users by Role</div></div>
                   <div className="db-card-body"><div style={{ height:220 }}><Doughnut data={roleDoughnut} options={doughnutOpts} /></div></div>
                 </div>
               </div>
@@ -399,9 +468,167 @@ const AdminDashboard: React.FC = () => {
             <>
               <div className="db-page-header">
                 <h2>NGO Management</h2>
-                <p>{ngos.length} partner NGOs · {ngos.filter(n=>n.status==='active').length} active</p>
+                <p>{ngos.length} partner NGOs · {ngos.filter(n=>n.status==='active').length} active · {pendingNgos} pending approval</p>
               </div>
+
+              {/* Pending Registrations */}
+              {ngoRegistrations.filter(r => r.approvalStatus === 'pending').length > 0 && (
+                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(249,115,22,0.25)' }}>
+                  <div className="db-card-header">
+                    <div className="db-card-title" style={{ color:'var(--c-accent)' }}>
+                      <i className="fas fa-clock"></i> Pending NGO Registrations
+                      <span className="db-badge badge-orange" style={{ marginLeft:10, fontSize:'0.75rem' }}>{pendingNgos}</span>
+                    </div>
+                  </div>
+                  <div className="db-card-body" style={{ paddingTop:0 }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                      {ngoRegistrations.filter(r => r.approvalStatus === 'pending').map(reg => (
+                        <div key={reg.id} style={{ background:'rgba(249,115,22,0.04)', border:'1px solid rgba(249,115,22,0.15)', borderRadius:'var(--r-sm)', padding:'16px 20px', display:'flex', flexWrap:'wrap', gap:16, alignItems:'center' }}>
+                          <div style={{ flex:1, minWidth:220 }}>
+                            <div style={{ fontWeight:700, fontSize:'0.95rem', marginBottom:4 }}>{reg.orgName}</div>
+                            <div style={{ fontSize:'0.82rem', color:'var(--c-muted)', display:'flex', flexWrap:'wrap', gap:12 }}>
+                              <span><i className="fas fa-user" style={{ marginRight:4 }}></i>{reg.contactName}</span>
+                              <span><i className="fas fa-envelope" style={{ marginRight:4 }}></i>{reg.email}</span>
+                              <span><i className="fas fa-location-dot" style={{ marginRight:4 }}></i>{reg.location}</span>
+                              <span><i className="fas fa-calendar" style={{ marginRight:4 }}></i>{reg.appliedDate}</span>
+                            </div>
+                            <div style={{ fontSize:'0.82rem', color:'#475569', marginTop:8, fontStyle:'italic' }}>"{reg.description}"</div>
+                          </div>
+                          <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                            <button className="db-btn db-btn-success db-btn-sm" onClick={() => handleNgoApproval(reg.id,'approved')}>
+                              <i className="fas fa-check"></i> Approve
+                            </button>
+                            <button className="db-btn db-btn-danger db-btn-sm" onClick={() => handleNgoApproval(reg.id,'rejected')}>
+                              <i className="fas fa-times"></i> Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* All NGO registrations history */}
+              {ngoRegistrations.filter(r => r.approvalStatus !== 'pending').length > 0 && (
+                <div className="db-card" style={{ marginBottom:24 }}>
+                  <div className="db-card-header">
+                    <div className="db-card-title"><i className="fas fa-history"></i> Registration History</div>
+                  </div>
+                  <div className="db-card-body" style={{ paddingTop:0 }}>
+                    <table className="db-table">
+                      <thead><tr><th>Organisation</th><th>Contact</th><th>Location</th><th>Applied</th><th>Status</th></tr></thead>
+                      <tbody>
+                        {ngoRegistrations.filter(r => r.approvalStatus !== 'pending').map(reg => (
+                          <tr key={reg.id}>
+                            <td style={{ fontWeight:600 }}>{reg.orgName}</td>
+                            <td style={{ fontSize:'0.83rem' }}>{reg.contactName}</td>
+                            <td style={{ fontSize:'0.83rem' }}>{reg.location}</td>
+                            <td style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>{reg.appliedDate}</td>
+                            <td><span className={`db-badge ${NGO_APPROVAL_BADGE[reg.approvalStatus]}`}>{reg.approvalStatus}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               <UserTable data={ngos} />
+            </>
+          )}
+
+          {/* ════ DELIVERIES ════ */}
+          {tab==='deliveries' && (
+            <>
+              <div className="db-page-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+                <div>
+                  <h2>Delivery Monitoring</h2>
+                  <p>{totalDeliveries} total deliveries · {completedDeliveries} completed · {deliveries.filter(d=>d.status!=='delivered'&&d.status!=='cancelled').length} active</p>
+                </div>
+              </div>
+
+              <div className="db-stats-row" style={{ marginBottom:24 }}>
+                {[
+                  { ico:'fa-truck-fast',   bg:'rgba(16,185,129,0.1)',  color:'var(--c-primary)',   num:totalDeliveries,                                               lbl:'Total Deliveries',  delta:'All time' },
+                  { ico:'fa-circle-check', bg:'rgba(37,99,235,0.1)',   color:'var(--c-secondary)', num:completedDeliveries,                                           lbl:'Completed',         delta:'Successfully delivered' },
+                  { ico:'fa-spinner',      bg:'rgba(249,115,22,0.1)',  color:'var(--c-accent)',    num:deliveries.filter(d=>d.status==='en_route'||d.status==='picked_up').length, lbl:'In Progress', delta:'Currently moving' },
+                  { ico:'fa-circle-xmark', bg:'rgba(239,68,68,0.1)',   color:'#EF4444',            num:deliveries.filter(d=>d.status==='cancelled').length,           lbl:'Cancelled',         delta:'This period' },
+                ].map((s,i) => (
+                  <div className="db-stat-chip" key={i}>
+                    <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
+                    <div><div className="db-stat-num">{s.num}</div><div className="db-stat-lbl">{s.lbl}</div><div className="db-stat-delta delta-up">{s.delta}</div></div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="db-card">
+                <div className="db-card-body" style={{ padding:0 }}>
+                  <table className="db-table">
+                    <thead>
+                      <tr><th>Item</th><th>Donor</th><th>NGO</th><th>Volunteer</th><th>Quantity</th><th>Date</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {deliveries.map(d => (
+                        <tr key={d.id}>
+                          <td style={{ fontWeight:500 }}>🍽️ {d.item}</td>
+                          <td style={{ fontSize:'0.83rem' }}>{d.donor}</td>
+                          <td style={{ fontSize:'0.83rem' }}>{d.ngo}</td>
+                          <td style={{ fontSize:'0.83rem' }}>{d.volunteer}</td>
+                          <td style={{ fontSize:'0.83rem' }}>{d.quantity}</td>
+                          <td style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>{d.date}</td>
+                          <td><span className={`db-badge ${DELIVERY_STATUS_BADGE[d.status]}`}>{d.status.replace('_',' ')}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ════ ANALYTICS ════ */}
+          {tab==='analytics' && (
+            <>
+              <div className="db-page-header">
+                <h2>Platform Analytics</h2>
+                <p>In-depth insights into donations, deliveries, and community impact</p>
+              </div>
+
+              <div className="db-stats-row">
+                {[
+                  { ico:'fa-users',      bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:users.length,    lbl:'Total Users',     delta:'+10 this month' },
+                  { ico:'fa-box-open',   bg:'rgba(37,99,235,0.1)',  color:'var(--c-secondary)', num:totalDonations,  lbl:'All Donations',   delta:'Cumulative' },
+                  { ico:'fa-truck-fast', bg:'rgba(249,115,22,0.1)', color:'var(--c-accent)',    num:totalDeliveries, lbl:'All Deliveries',  delta:completedDeliveries + ' completed' },
+                  { ico:'fa-seedling',   bg:'rgba(139,92,246,0.1)', color:'#8B5CF6',            num:'532 kg',        lbl:'Food Rescued',    delta:'Prevented waste' },
+                ].map((s,i) => (
+                  <div className="db-stat-chip" key={i}>
+                    <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
+                    <div><div className="db-stat-num">{s.num}</div><div className="db-stat-lbl">{s.lbl}</div><div className="db-stat-delta delta-up">{s.delta}</div></div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="db-card" style={{ marginBottom:24 }}>
+                <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-line"></i> Monthly Donations vs Meals Saved</div></div>
+                <div className="db-card-body"><div style={{ height:280 }}><Line data={lineData} options={lineOpts} /></div></div>
+              </div>
+
+              <div className="db-chart-row">
+                <div className="db-card db-chart-card">
+                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-bar"></i> New User Registrations</div></div>
+                  <div className="db-card-body"><div style={{ height:240 }}><Bar data={userGrowthData} options={growthOpts} /></div></div>
+                </div>
+                <div className="db-card db-chart-card db-chart-card--sm">
+                  <div className="db-card-header"><div className="db-card-title"><i className="fas fa-chart-pie"></i> Users by Role</div></div>
+                  <div className="db-card-body"><div style={{ height:220 }}><Doughnut data={roleDoughnut} options={doughnutOpts} /></div></div>
+                </div>
+              </div>
+
+              <div className="db-card" style={{ marginTop:24 }}>
+                <div className="db-card-header"><div className="db-card-title"><i className="fas fa-trophy"></i> Top Donors by Contributions</div></div>
+                <div className="db-card-body"><div style={{ height:240 }}><Bar data={barData} options={barOpts} /></div></div>
+              </div>
             </>
           )}
 
@@ -436,6 +663,8 @@ const AdminDashboard: React.FC = () => {
 
         </div>
       </main>
+
+      {toastMsg && <div className="db-toast"><i className="fas fa-circle-check"></i> {toastMsg}</div>}
     </div>
   );
 };
