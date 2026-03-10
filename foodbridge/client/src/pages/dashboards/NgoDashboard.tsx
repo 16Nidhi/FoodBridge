@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -12,6 +12,19 @@ import '../../components/common/Dashboard.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
 
+/* ─── Expiry helper ─────────────────────────────────────────── */
+const calcExpiry = (ts: number, now: number) => {
+  const diff = ts - now;
+  if (diff <= 0) return { label: 'Expired', color: '#DC2626', bg: '#FEE2E2', urgency: 'red' as const };
+  const totalMins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  if (hrs >= 4) return { label, color: '#059669', bg: '#D1FAE5', urgency: 'green' as const };
+  if (hrs >= 2) return { label, color: '#D97706', bg: '#FEF3C7', urgency: 'yellow' as const };
+  return { label, color: '#DC2626', bg: '#FEE2E2', urgency: 'red' as const };
+};
+
 /* ─── Types ─────────────────────────────────────────────────── */
 type DonationStatus = 'available' | 'reserved' | 'received' | 'distributed';
 type DeliveryStatus = 'assigned' | 'picked_up' | 'en_route' | 'arrived' | 'confirmed';
@@ -23,9 +36,12 @@ interface Donation {
   quantity: string;
   address: string;
   expiryDate: string;
+  expiryTimestamp: number;   // epoch ms for countdown
+  ngoWindowEnd: number;      // epoch ms when NGO-priority window ends
   category: string;
   status: DonationStatus;
   reservedBy?: string;
+  assignedVolunteer?: string;
 }
 
 interface IncomingDelivery {
@@ -42,14 +58,17 @@ interface IncomingDelivery {
 }
 
 /* ─── Mock data ─────────────────────────────────────────────── */
+const BASE = Date.now();
+const H    = 3600000;
+
 const INIT_DONATIONS: Donation[] = [
-  { id:'1', title:'Cooked Biryani',      donor:'Sunshine Hotel',  quantity:'25 kg',       address:'12 MG Road, Bengaluru',    expiryDate:'2026-03-08', category:'Cooked Food', status:'available' },
-  { id:'2', title:'Fresh Bread & Rolls', donor:'City Bakery',     quantity:'10 kg',       address:'5 Park Street, Kolkata',   expiryDate:'2026-03-09', category:'Bakery',      status:'reserved', reservedBy:'Your NGO' },
-  { id:'3', title:'Mixed Vegetables',    donor:'Fresh Mart',      quantity:'15 kg',       address:'88 Church Street, Chennai',expiryDate:'2026-03-10', category:'Produce',     status:'available' },
-  { id:'4', title:'Dal & Rice',          donor:'Hotel Grandeur',  quantity:'30 servings', address:'4 Infantry Road, Delhi',   expiryDate:'2026-03-07', category:'Cooked Food', status:'received' },
-  { id:'5', title:'Fruit Platter',       donor:'Grand Catering',  quantity:'8 kg',        address:'22 Bandra West, Mumbai',   expiryDate:'2026-03-09', category:'Fruits',      status:'available' },
-  { id:'6', title:'Dairy Products',      donor:'Amul Booth',      quantity:'20 litres',   address:'7 Linking Road, Mumbai',   expiryDate:'2026-03-08', category:'Dairy',       status:'distributed' },
-  { id:'7', title:'Packaged Biscuits',   donor:'Parle Foods',     quantity:'50 boxes',    address:'Andheri West, Mumbai',     expiryDate:'2026-04-01', category:'Packaged',    status:'available' },
+  { id:'1', title:'Cooked Biryani',      donor:'Sunshine Hotel',  quantity:'25 kg',       address:'12 MG Road, Bengaluru',    expiryDate:'2026-03-08', expiryTimestamp: BASE + 2*H,    ngoWindowEnd: BASE + 1.5*H,  category:'Cooked Food', status:'available' },
+  { id:'2', title:'Fresh Bread & Rolls', donor:'City Bakery',     quantity:'10 kg',       address:'5 Park Street, Kolkata',   expiryDate:'2026-03-09', expiryTimestamp: BASE + 5*H,    ngoWindowEnd: BASE - 1*H,    category:'Bakery',      status:'reserved', reservedBy:'Your NGO' },
+  { id:'3', title:'Mixed Vegetables',    donor:'Fresh Mart',      quantity:'15 kg',       address:'88 Church Street, Chennai',expiryDate:'2026-03-10', expiryTimestamp: BASE + 6*H,    ngoWindowEnd: BASE + 0.5*H,  category:'Produce',     status:'available' },
+  { id:'4', title:'Dal & Rice',          donor:'Hotel Grandeur',  quantity:'30 servings', address:'4 Infantry Road, Delhi',   expiryDate:'2026-03-07', expiryTimestamp: BASE + 1*H,    ngoWindowEnd: BASE - 2*H,    category:'Cooked Food', status:'received' },
+  { id:'5', title:'Fruit Platter',       donor:'Grand Catering',  quantity:'8 kg',        address:'22 Bandra West, Mumbai',   expiryDate:'2026-03-09', expiryTimestamp: BASE + 4*H,    ngoWindowEnd: BASE - 0.5*H,  category:'Fruits',      status:'available' },
+  { id:'6', title:'Dairy Products',      donor:'Amul Booth',      quantity:'20 litres',   address:'7 Linking Road, Mumbai',   expiryDate:'2026-03-08', expiryTimestamp: BASE - 1*H,    ngoWindowEnd: BASE - 3*H,    category:'Dairy',       status:'distributed' },
+  { id:'7', title:'Packaged Biscuits',   donor:'Parle Foods',     quantity:'50 boxes',    address:'Andheri West, Mumbai',     expiryDate:'2026-04-01', expiryTimestamp: BASE + 3*H,    ngoWindowEnd: BASE + 2*H,    category:'Packaged',    status:'available' },
 ];
 
 const INIT_DELIVERIES: IncomingDelivery[] = [
@@ -102,16 +121,53 @@ const NgoDashboard: React.FC = () => {
   const [deliveries, setDeliveries]   = useState<IncomingDelivery[]>(INIT_DELIVERIES);
   const [filter, setFilter]           = useState<'all'|DonationStatus>('all');
   const [toastMsg, setToastMsg]       = useState<string | null>(null);
+  const [now, setNow]                 = useState(Date.now());
+  /* ─── Rating modal state ─── */
+  const [ratingModal, setRatingModal] = useState<{ deliveryId: string; volunteer: string; stars: number } | null>(null);
+  const [submittedRatings, setSubmittedRatings] = useState<Record<string, number>>({});
+  /* ─── Assign volunteer modal state ─── */
+  const [assignModal, setAssignModal] = useState<string | null>(null); // donationId
+  const [assignVolunteer, setAssignVolunteer] = useState('');
+
+  /* Volunteers for assignment dropdown */
+  const NGO_VOLUNTEERS = ['Ananya Sharma', 'Raj Kumar', 'Arjun Mehta', 'Priya Singh', 'Karan Anand'];
 
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'NG';
   const displayName = user?.name || 'NGO Manager';
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
+  /* Live countdown - updates every 30s */
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); };
   const handleLogout = () => { dispatch(logout()); navigate('/login'); };
 
   const handleConfirmDelivery = (id: string) => {
-    setDeliveries(prev => prev.map(d => d.id===id ? {...d, status:'confirmed'} : d));
-    showToast('Food received confirmed! Thank you for updating.');
+    const delivery = deliveries.find(d => d.id === id);
+    if (delivery) {
+      // Show rating modal before confirming
+      setRatingModal({ deliveryId: id, volunteer: delivery.volunteer, stars: 5 });
+    }
+  };
+
+  const submitRating = () => {
+    if (!ratingModal) return;
+    setDeliveries(prev => prev.map(d => d.id === ratingModal.deliveryId ? {...d, status:'confirmed'} : d));
+    setSubmittedRatings(prev => ({ ...prev, [ratingModal.deliveryId]: ratingModal.stars }));
+    showToast(`⭐ Rated ${ratingModal.volunteer} ${ratingModal.stars}/5 — Thank you!`);
+    setRatingModal(null);
+  };
+
+  const handleAssignVolunteer = (donationId: string) => {
+    if (!assignVolunteer) return;
+    setDonations(prev => prev.map(d => d.id === donationId
+      ? { ...d, status:'reserved', reservedBy:displayName, assignedVolunteer:assignVolunteer }
+      : d));
+    showToast(`✅ ${assignVolunteer} assigned to pick up this donation.`);
+    setAssignModal(null);
+    setAssignVolunteer('');
   };
 
   const handleDeliveryStep = (id: string, next: DeliveryStatus) => {
@@ -495,53 +551,92 @@ const NgoDashboard: React.FC = () => {
                 ? <div className="db-empty-state"><i className="fas fa-boxes-stacked"></i><p>No donations in this category.</p></div>
                 : (
                   <div className="pickup-cards-grid">
-                    {filtered.map(d => (
-                      <div className="pickup-card" key={d.id} style={{ '--accent-color':'var(--c-accent)' } as any}>
-                        <div className="pickup-card-header">
-                          <div>
-                            <div className="pickup-card-title">{EMOJI_MAP[d.category]||'🍽️'} {d.title}</div>
-                            <div style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginTop:4 }}>
-                              <i className="fas fa-store" style={{ marginRight:5 }}></i>{d.donor}
+                    {filtered.map(d => {
+                      const expiry   = calcExpiry(d.expiryTimestamp, now);
+                      const ngoWindow = d.ngoWindowEnd > now;
+                      const windowLeft = ngoWindow ? calcExpiry(d.ngoWindowEnd, now) : null;
+                      return (
+                        <div className="pickup-card" key={d.id} style={{ borderTop:`3px solid ${expiry.color}` }}>
+                          <div className="pickup-card-header">
+                            <div>
+                              <div className="pickup-card-title">{EMOJI_MAP[d.category]||'🍽️'} {d.title}</div>
+                              <div style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginTop:4 }}>
+                                <i className="fas fa-store" style={{ marginRight:5 }}></i>{d.donor}
+                              </div>
                             </div>
+                            <span className={`db-badge ${STATUS_BADGE[d.status]}`}>{d.status}</span>
                           </div>
-                          <span className={`db-badge ${STATUS_BADGE[d.status]}`}>{d.status}</span>
-                        </div>
 
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'12px 0' }}>
-                          <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{d.quantity}</span>
-                          <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{d.address.split(',')[0]}</span>
-                          <span className="donation-meta-item"><i className="fas fa-tag"></i>{d.category}</span>
-                          <span className="donation-meta-item"><i className="fas fa-calendar"></i>{d.expiryDate}</span>
-                        </div>
-
-                        {d.reservedBy && (
-                          <div style={{ fontSize:'0.78rem', color:'var(--c-secondary)', background:'rgba(37,99,235,0.06)', borderRadius:'var(--r-sm)', padding:'6px 10px', marginBottom:10 }}>
-                            <i className="fas fa-bookmark" style={{ marginRight:5 }}></i>Reserved by {d.reservedBy}
+                          {/* Expiry urgency badge */}
+                          <div style={{ display:'flex', alignItems:'center', gap:8, margin:'10px 0 4px' }}>
+                            <span style={{
+                              display:'inline-flex', alignItems:'center', gap:5,
+                              padding:'4px 10px', borderRadius:999,
+                              background: expiry.bg, color: expiry.color,
+                              fontSize:'0.75rem', fontWeight:700,
+                            }}>
+                              <i className="fas fa-fire" style={{ fontSize:'0.65rem' }}></i>
+                              {expiry.urgency === 'red' ? '🔴 Urgent:' : expiry.urgency === 'yellow' ? '🟡 Soon:' : '🟢 Fresh:'}
+                              &nbsp;{expiry.label} left
+                            </span>
+                            {ngoWindow && (
+                              <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:999, background:'rgba(139,92,246,0.1)', color:'#6D28D9', fontSize:'0.72rem', fontWeight:700 }}>
+                                <i className="fas fa-crown" style={{ fontSize:'0.65rem' }}></i>
+                                NGO Priority · {windowLeft?.label}
+                              </span>
+                            )}
                           </div>
-                        )}
 
-                        <div className="pickup-card-actions">
-                          {d.status === 'available' && (
-                            <button className="db-btn db-btn-primary" style={{ flex:1 }} onClick={() => handleClaim(d.id)}>
-                              <i className="fas fa-hand-holding"></i> Claim Donation
-                            </button>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'10px 0' }}>
+                            <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{d.quantity}</span>
+                            <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{d.address.split(',')[0]}</span>
+                            <span className="donation-meta-item"><i className="fas fa-tag"></i>{d.category}</span>
+                          </div>
+
+                          {d.reservedBy && (
+                            <div style={{ fontSize:'0.78rem', color:'var(--c-secondary)', background:'rgba(37,99,235,0.06)', borderRadius:'var(--r-sm)', padding:'6px 10px', marginBottom:10 }}>
+                              <i className="fas fa-bookmark" style={{ marginRight:5 }}></i>Reserved by {d.reservedBy}
+                              {d.assignedVolunteer && <> · <i className="fas fa-person-biking" style={{ marginLeft:6, color:'var(--c-accent)' }}></i> {d.assignedVolunteer}</>}
+                            </div>
                           )}
-                          {d.status === 'reserved' && (
-                            <button className="db-btn db-btn-secondary" style={{ flex:1 }} onClick={() => handleReceive(d.id)}>
-                              <i className="fas fa-inbox"></i> Mark Received
-                            </button>
-                          )}
-                          {d.status === 'received' && (
-                            <button className="db-btn db-btn-success" style={{ flex:1 }} onClick={() => handleDistribute(d.id)}>
-                              <i className="fas fa-people-group"></i> Mark Distributed
-                            </button>
-                          )}
-                          {d.status === 'distributed' && (
-                            <span className="db-badge badge-gray" style={{ margin:'0 auto', padding:'8px 16px' }}>Completed</span>
-                          )}
+
+                          <div className="pickup-card-actions">
+                            {d.status === 'available' && (
+                              <>
+                                <button className="db-btn db-btn-primary" style={{ flex:1 }} onClick={() => handleClaim(d.id)}>
+                                  <i className="fas fa-hand-holding"></i> Claim Donation
+                                </button>
+                                {ngoWindow && (
+                                  <button className="db-btn db-btn-secondary" onClick={() => { setAssignModal(d.id); setAssignVolunteer(''); }}>
+                                    <i className="fas fa-person-biking"></i> Assign Volunteer
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            {d.status === 'reserved' && (
+                              <>
+                                <button className="db-btn db-btn-secondary" style={{ flex:1 }} onClick={() => handleReceive(d.id)}>
+                                  <i className="fas fa-inbox"></i> Mark Received
+                                </button>
+                                {!d.assignedVolunteer && (
+                                  <button className="db-btn db-btn-ghost" onClick={() => { setAssignModal(d.id); setAssignVolunteer(''); }}>
+                                    <i className="fas fa-person-biking"></i>
+                                  </button>
+                                )}
+                              </>
+                            )}
+                            {d.status === 'received' && (
+                              <button className="db-btn db-btn-success" style={{ flex:1 }} onClick={() => handleDistribute(d.id)}>
+                                <i className="fas fa-people-group"></i> Mark Distributed
+                              </button>
+                            )}
+                            {d.status === 'distributed' && (
+                              <span className="db-badge badge-gray" style={{ margin:'0 auto', padding:'8px 16px' }}>Completed</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )
               }
@@ -693,6 +788,90 @@ const NgoDashboard: React.FC = () => {
       </main>
 
       {toastMsg && <div className="db-toast"><i className="fas fa-circle-check"></i> {toastMsg}</div>}
+
+      {/* ════ RATING MODAL ════ */}
+      {ratingModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#fff', borderRadius:'var(--r-xl)', padding:32, maxWidth:460, width:'100%', boxShadow:'var(--sh-lg)', animation:'fadeIn 0.2s ease' }}>
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:'3rem', marginBottom:8 }}>⭐</div>
+              <h3 style={{ fontFamily:'var(--ff-head)', fontSize:'1.2rem', fontWeight:800 }}>Rate Volunteer</h3>
+              <p style={{ color:'var(--c-muted)', fontSize:'0.88rem' }}>
+                How was your experience with <strong>{ratingModal.volunteer}</strong>?
+              </p>
+            </div>
+
+            <div style={{ display:'flex', justifyContent:'center', gap:12, marginBottom:24 }}>
+              {[1,2,3,4,5].map(star => (
+                <button key={star} onClick={() => setRatingModal(r => r ? {...r, stars:star} : r)}
+                  style={{
+                    background:'none', border:'none', cursor:'pointer',
+                    fontSize:'2.2rem', transition:'transform 0.15s',
+                    transform: star <= ratingModal.stars ? 'scale(1.15)' : 'scale(1)',
+                    color: star <= ratingModal.stars ? '#F59E0B' : '#E2E8F0',
+                  }}>
+                  ★
+                </button>
+              ))}
+            </div>
+
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <span style={{
+                padding:'6px 18px', borderRadius:999,
+                background: ratingModal.stars >= 4 ? '#D1FAE5' : ratingModal.stars >= 3 ? '#FEF3C7' : '#FEE2E2',
+                color: ratingModal.stars >= 4 ? '#059669' : ratingModal.stars >= 3 ? '#D97706' : '#DC2626',
+                fontFamily:'var(--ff-head)', fontSize:'0.85rem', fontWeight:700,
+              }}>
+                {ratingModal.stars === 5 ? '🌟 Excellent' : ratingModal.stars === 4 ? '👍 Good' : ratingModal.stars === 3 ? '😐 Average' : ratingModal.stars === 2 ? '😕 Below Average' : '👎 Poor'}
+              </span>
+            </div>
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button className="db-btn db-btn-ghost" style={{ flex:1 }}
+                onClick={() => setRatingModal(null)}>
+                Skip for now
+              </button>
+              <button className="db-btn db-btn-primary" style={{ flex:2 }}
+                onClick={submitRating}>
+                <i className="fas fa-star"></i> Submit Rating & Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ ASSIGN VOLUNTEER MODAL ════ */}
+      {assignModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#fff', borderRadius:'var(--r-xl)', padding:32, maxWidth:420, width:'100%', boxShadow:'var(--sh-lg)' }}>
+            <h3 style={{ fontFamily:'var(--ff-head)', fontSize:'1.1rem', fontWeight:800, marginBottom:6 }}>
+              <i className="fas fa-person-biking" style={{ color:'var(--c-accent)', marginRight:8 }}></i>Assign Volunteer
+            </h3>
+            <p style={{ color:'var(--c-muted)', fontSize:'0.85rem', marginBottom:20 }}>
+              Pick one of your verified volunteers to collect this donation.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+              {NGO_VOLUNTEERS.map(v => (
+                <label key={v} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:'var(--r-md)', border:`1.5px solid ${assignVolunteer===v?'var(--c-primary)':'var(--c-border)'}`, cursor:'pointer', background: assignVolunteer===v?'rgba(16,185,129,0.06)':'#fff', transition:'all 0.2s' }}>
+                  <input type="radio" name="assignVol" value={v} checked={assignVolunteer===v} onChange={() => setAssignVolunteer(v)} style={{ accentColor:'var(--c-primary)' }} />
+                  <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10B981,#2563EB)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'0.75rem', fontWeight:700 }}>
+                    {v.split(' ').map((n:string)=>n[0]).join('')}
+                  </div>
+                  <span style={{ fontWeight:600, fontSize:'0.875rem' }}>{v}</span>
+                  <span className="db-badge badge-green" style={{ marginLeft:'auto', fontSize:'0.7rem' }}>Verified</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button className="db-btn db-btn-ghost" style={{ flex:1 }} onClick={() => { setAssignModal(null); setAssignVolunteer(''); }}>Cancel</button>
+              <button className="db-btn db-btn-primary" style={{ flex:2 }} disabled={!assignVolunteer}
+                onClick={() => handleAssignVolunteer(assignModal)}>
+                <i className="fas fa-check"></i> Assign & Reserve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

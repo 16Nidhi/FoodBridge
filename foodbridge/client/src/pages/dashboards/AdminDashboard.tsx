@@ -17,6 +17,8 @@ type UserRole   = 'donor' | 'ngo' | 'volunteer' | 'admin';
 type UserStatus = 'active' | 'inactive' | 'suspended';
 type NgoApprovalStatus = 'pending' | 'approved' | 'rejected';
 type DeliveryStatus = 'assigned' | 'picked_up' | 'en_route' | 'delivered' | 'cancelled';
+type VerifStatus = 'pending' | 'verified' | 'rejected';
+type IdType = 'aadhar' | 'student_id' | 'driving_license';
 
 interface AppUser {
   id: string; name: string; email: string; role: UserRole;
@@ -35,6 +37,19 @@ interface PlatformDelivery {
   id: string; item: string; donor: string; ngo: string;
   volunteer: string; quantity: string; date: string;
   status: DeliveryStatus;
+}
+
+interface VolunteerVerification {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  idType: IdType;
+  idNumber: string;
+  location: string;
+  appliedDate: string;
+  pickupsCompleted: number;
+  status: VerifStatus;
 }
 
 /* ─── Mock data ─────────────────────────────────────────────── */
@@ -68,6 +83,14 @@ const MOCK_DELIVERIES: PlatformDelivery[] = [
   { id:'del7', item:'Packaged Biscuits',donor:'Parle Foods',    ngo:'Green Hope Trust', volunteer:'Ananya Verma', quantity:'50 boxes',    date:'2026-03-07', status:'cancelled' },
 ];
 
+const MOCK_VERIFICATIONS: VolunteerVerification[] = [
+  { id:'vv1', name:'Ramesh Nair',    email:'ramesh@gmail.com',   phone:'+91-9812345678', idType:'aadhar',          idNumber:'XXXX-XXXX-3421', location:'Bengaluru', appliedDate:'2026-03-09', pickupsCompleted:2, status:'pending'  },
+  { id:'vv2', name:'Sneha Patil',    email:'sneha@outlook.com',  phone:'+91-9723456789', idType:'student_id',      idNumber:'VIT-2023-0891',  location:'Pune',      appliedDate:'2026-03-08', pickupsCompleted:1, status:'pending'  },
+  { id:'vv3', name:'Deepak Joshi',   email:'deepak@yahoo.com',   phone:'+91-9634567890', idType:'driving_license', idNumber:'KA-03-20230012', location:'Bengaluru', appliedDate:'2026-03-07', pickupsCompleted:3, status:'pending'  },
+  { id:'vv4', name:'Meena Agarwal',  email:'meena@gmail.com',    phone:'+91-9545678901', idType:'aadhar',          idNumber:'XXXX-XXXX-7782', location:'Mumbai',    appliedDate:'2026-03-06', pickupsCompleted:2, status:'verified' },
+  { id:'vv5', name:'Farhan Shaikh',  email:'farhan@gmail.com',   phone:'+91-9456789012', idType:'student_id',      idNumber:'MU-UNIV-1029',   location:'Mumbai',    appliedDate:'2026-03-05', pickupsCompleted:0, status:'rejected' },
+];
+
 const MONTHS = ['Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
 
 const ROLE_BADGE: Record<UserRole,string>     = { donor:'badge-green', ngo:'badge-blue', volunteer:'badge-orange', admin:'badge-red' };
@@ -79,7 +102,7 @@ const NGO_APPROVAL_BADGE: Record<NgoApprovalStatus,string> = {
   pending:'badge-orange', approved:'badge-green', rejected:'badge-red',
 };
 
-type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users' | 'deliveries' | 'analytics';
+type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users' | 'deliveries' | 'analytics' | 'verifications';
 
 /* ═══════════════════════════════════════════════════════════════
    ADMIN DASHBOARD PAGE
@@ -94,6 +117,7 @@ const AdminDashboard: React.FC = () => {
   const [users, setUsers]         = useState<AppUser[]>(MOCK_USERS);
   const [ngoRegistrations, setNgoRegistrations] = useState<NgoRegistration[]>(MOCK_NGO_REGISTRATIONS);
   const [deliveries]              = useState<PlatformDelivery[]>(MOCK_DELIVERIES);
+  const [volunteerVerifications, setVolunteerVerifications] = useState<VolunteerVerification[]>(MOCK_VERIFICATIONS);
   const [roleFilter, setRoleFilter] = useState<'all'|UserRole>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMsg, setToastMsg]   = useState<string | null>(null);
@@ -112,6 +136,12 @@ const AdminDashboard: React.FC = () => {
     showToast(status === 'approved' ? 'NGO registration approved!' : 'NGO registration rejected.');
   };
 
+  const handleVerifAction = (id: string, status: VerifStatus) => {
+    setVolunteerVerifications(prev => prev.map(v => v.id===id ? {...v, status} : v));
+    const v = volunteerVerifications.find(v => v.id === id);
+    if (v) showToast(status === 'verified' ? `✅ ${v.name} is now a verified volunteer!` : `❌ ${v.name}'s verification rejected.`);
+  };
+
   /* Computed */
   const donors     = users.filter(u => u.role==='donor');
   const volunteers = users.filter(u => u.role==='volunteer');
@@ -121,6 +151,7 @@ const AdminDashboard: React.FC = () => {
   const totalDonations = donors.reduce((a,u) => a + (u.donations||0), 0);
   const totalPickups   = volunteers.reduce((a,u) => a + (u.pickups||0), 0);
   const pendingNgos    = ngoRegistrations.filter(r => r.approvalStatus === 'pending').length;
+  const pendingVerifs  = volunteerVerifications.filter(v => v.status === 'pending').length;
   const totalDeliveries = deliveries.length;
   const completedDeliveries = deliveries.filter(d => d.status === 'delivered').length;
 
@@ -251,18 +282,20 @@ const AdminDashboard: React.FC = () => {
           <div className="db-nav-section">
             <div className="db-nav-label">Admin Menu</div>
             {([
-              ['overview',   'fa-chart-line',   'Dashboard'],
-              ['users',      'fa-users',        'All Users'],
-              ['donors',     'fa-box-open',     'Donors'],
-              ['volunteers', 'fa-motorcycle',   'Volunteers'],
-              ['ngos',       'fa-building',     'NGOs'],
-              ['deliveries', 'fa-truck-fast',   'Deliveries'],
-              ['analytics',  'fa-chart-bar',    'Analytics'],
+              ['overview',       'fa-chart-line',   'Dashboard'],
+              ['users',          'fa-users',        'All Users'],
+              ['donors',         'fa-box-open',     'Donors'],
+              ['volunteers',     'fa-motorcycle',   'Volunteers'],
+              ['verifications',  'fa-id-card',      'Volunteer Verifications'],
+              ['ngos',           'fa-building',     'NGOs'],
+              ['deliveries',     'fa-truck-fast',   'Deliveries'],
+              ['analytics',      'fa-chart-bar',    'Analytics'],
             ] as [Tab,string,string][]).map(([t,icon,label]) => (
               <button key={t} className={`db-nav-item${tab===t?' active':''}`}
                 onClick={() => { setTab(t); setSidebarOpen(false); }}>
                 <i className={`fas ${icon}`}></i> {label}
-                {t==='ngos' && pendingNgos>0 && <span className="notif-badge"></span>}
+                {t==='ngos'          && pendingNgos>0   && <span className="notif-badge"></span>}
+                {t==='verifications' && pendingVerifs>0 && <span className="notif-badge"></span>}
               </button>
             ))}
           </div>
@@ -292,13 +325,14 @@ const AdminDashboard: React.FC = () => {
               <i className="fas fa-bars"></i>
             </button>
             <div className="db-topbar-title">
-              {tab==='overview'   && '📊 Admin Dashboard'}
-              {tab==='users'      && '👥 All Users'}
-              {tab==='donors'     && '🍽️ Donor Management'}
-              {tab==='volunteers' && '🚴 Volunteer Management'}
-              {tab==='ngos'       && '🏢 NGO Management'}
-              {tab==='deliveries' && '🚚 Delivery Monitoring'}
-              {tab==='analytics'  && '📈 Platform Analytics'}
+              {tab==='overview'       && '📊 Admin Dashboard'}
+              {tab==='users'          && '👥 All Users'}
+              {tab==='donors'         && '🍽️ Donor Management'}
+              {tab==='volunteers'     && '🚴 Volunteer Management'}
+              {tab==='verifications'  && '🪪 Volunteer Verifications'}
+              {tab==='ngos'           && '🏢 NGO Management'}
+              {tab==='deliveries'     && '🚚 Delivery Monitoring'}
+              {tab==='analytics'      && '📈 Platform Analytics'}
             </div>
           </div>
           <div className="db-topbar-right">
@@ -338,6 +372,26 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Pending volunteer verifications alert */}
+              {pendingVerifs > 0 && (
+                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(37,99,235,0.3)', background:'rgba(239,246,255,0.9)' }}>
+                  <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(37,99,235,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <i className="fas fa-id-card" style={{ color:'var(--c-secondary)', fontSize:'1.1rem' }}></i>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'#1e3a8a' }}>{pendingVerifs} Pending Volunteer Verification{pendingVerifs>1?'s':''}</div>
+                        <div style={{ fontSize:'0.82rem', color:'#1d4ed8' }}>Review submitted ID documents and verify volunteers</div>
+                      </div>
+                    </div>
+                    <button className="db-btn db-btn-sm" style={{ background:'#2563EB', color:'#fff' }} onClick={() => setTab('verifications')}>
+                      Review Now <i className="fas fa-arrow-right"></i>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Pending NGO registrations alert */}
               {pendingNgos > 0 && (
@@ -628,6 +682,129 @@ const AdminDashboard: React.FC = () => {
               <div className="db-card" style={{ marginTop:24 }}>
                 <div className="db-card-header"><div className="db-card-title"><i className="fas fa-trophy"></i> Top Donors by Contributions</div></div>
                 <div className="db-card-body"><div style={{ height:240 }}><Bar data={barData} options={barOpts} /></div></div>
+              </div>
+            </>
+          )}
+
+          {/* ════ VOLUNTEER VERIFICATIONS ════ */}
+          {tab==='verifications' && (
+            <>
+              <div className="db-page-header">
+                <h2>Volunteer Verifications 🪪</h2>
+                <p>{pendingVerifs} pending · {volunteerVerifications.length} total submissions</p>
+              </div>
+
+              {/* Stats row */}
+              <div className="db-stats-row" style={{ marginBottom:24 }}>
+                {[
+                  { ico:'fa-hourglass-half', bg:'rgba(249,115,22,0.1)', color:'var(--c-accent)',    num:pendingVerifs,    lbl:'Pending Review' },
+                  { ico:'fa-circle-check',   bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:volunteerVerifications.filter(v=>v.status==='verified').length,  lbl:'Verified' },
+                  { ico:'fa-circle-xmark',   bg:'rgba(239,68,68,0.1)',  color:'#EF4444',           num:volunteerVerifications.filter(v=>v.status==='rejected').length,  lbl:'Rejected' },
+                ].map((s,i) => (
+                  <div className="db-stat-chip" key={i}>
+                    <div className="db-stat-ico" style={{ background:s.bg }}>
+                      <i className={`fas ${s.ico}`} style={{ color:s.color }}></i>
+                    </div>
+                    <div>
+                      <div className="db-stat-num">{s.num}</div>
+                      <div className="db-stat-lbl">{s.lbl}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pending verifications */}
+              {volunteerVerifications.filter(v => v.status==='pending').length > 0 && (
+                <div className="db-card" style={{ marginBottom:24 }}>
+                  <div className="db-card-header">
+                    <div className="db-card-title"><i className="fas fa-hourglass-half"></i> Awaiting Review</div>
+                  </div>
+                  <div className="db-card-body" style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                    {volunteerVerifications.filter(v => v.status==='pending').map(v => (
+                      <div key={v.id} style={{ border:'1px solid var(--c-border)', borderRadius:12, padding:20, background:'var(--c-surface)', display:'grid', gridTemplateColumns:'1fr auto', gap:16, alignItems:'start' }}>
+                        <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
+                          {/* ID preview */}
+                          <div style={{ width:110, height:80, borderRadius:8, background:'rgba(37,99,235,0.08)', border:'1.5px dashed #93C5FD', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+                            <i className="fas fa-id-card" style={{ fontSize:'2rem', color:'#93C5FD' }}></i>
+                          </div>
+                          <div style={{ flex:1, minWidth:200 }}>
+                            <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:4 }}>{v.name}</div>
+                            <div style={{ fontSize:'0.83rem', color:'var(--c-muted)', marginBottom:6 }}>{v.email} · {v.phone}</div>
+                            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                              <span className="db-badge badge-orange" style={{ fontSize:'0.75rem' }}>
+                                <i className="fas fa-id-card" style={{ marginRight:4 }}></i>{v.idType.charAt(0).toUpperCase()+v.idType.slice(1)} ID
+                              </span>
+                              <span className="db-badge badge-gray" style={{ fontSize:'0.75rem' }}>
+                                <i className="fas fa-location-dot" style={{ marginRight:4 }}></i>{v.location}
+                              </span>
+                              <span className="db-badge badge-blue" style={{ fontSize:'0.75rem' }}>
+                                <i className="fas fa-truck-fast" style={{ marginRight:4 }}></i>{v.pickupsCompleted} pickups done
+                              </span>
+                            </div>
+                            <div style={{ fontSize:'0.78rem', color:'var(--c-muted)', marginTop:6 }}>Applied: {v.appliedDate}</div>
+                          </div>
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:130 }}>
+                          <button
+                            className="db-btn db-btn-sm"
+                            style={{ background:'#10B981', color:'#fff', width:'100%' }}
+                            onClick={() => handleVerifAction(v.id, 'verified')}
+                          >
+                            <i className="fas fa-circle-check"></i> Approve
+                          </button>
+                          <button
+                            className="db-btn db-btn-sm"
+                            style={{ background:'#EF4444', color:'#fff', width:'100%' }}
+                            onClick={() => handleVerifAction(v.id, 'rejected')}
+                          >
+                            <i className="fas fa-circle-xmark"></i> Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* History table */}
+              <div className="db-card">
+                <div className="db-card-header">
+                  <div className="db-card-title"><i className="fas fa-clock-rotate-left"></i> Verification History</div>
+                </div>
+                <div className="db-card-body">
+                  <table className="db-table">
+                    <thead>
+                      <tr>
+                        <th>Volunteer</th>
+                        <th>Contact</th>
+                        <th>ID Type</th>
+                        <th>Location</th>
+                        <th>Applied</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {volunteerVerifications.filter(v => v.status !== 'pending').map(v => (
+                        <tr key={v.id}>
+                          <td style={{ fontWeight:600 }}>{v.name}</td>
+                          <td style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>{v.email}</td>
+                          <td>{v.idType.charAt(0).toUpperCase()+v.idType.slice(1)}</td>
+                          <td>{v.location}</td>
+                          <td style={{ fontSize:'0.82rem' }}>{v.appliedDate}</td>
+                          <td>
+                            {v.status==='verified'
+                              ? <span className="db-badge badge-green"><i className="fas fa-circle-check" style={{ marginRight:4 }}></i>Verified</span>
+                              : <span className="db-badge badge-red"><i className="fas fa-circle-xmark" style={{ marginRight:4 }}></i>Rejected</span>
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                      {volunteerVerifications.filter(v => v.status !== 'pending').length === 0 && (
+                        <tr><td colSpan={6} style={{ textAlign:'center', color:'var(--c-muted)', padding:'24px 0' }}>No processed verifications yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}

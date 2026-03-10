@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -23,20 +23,38 @@ interface PickupRequest {
   distance: string;
   weight: string;
   expiryIn: string;
+  expiryTimestamp: number;   // actual epoch ms for countdown
+  ngoWindowEnd: number;      // epoch ms when NGO-priority window ends
   ngo: string;
   ngoAddress: string;
   status: PickupStatus;
   category: string;
 }
 
+/* ─── Expiry helper ─────────────────────────────────────────── */
+const calcExpiry = (ts: number, now: number) => {
+  const diff = ts - now;
+  if (diff <= 0) return { label: 'Expired', color: '#DC2626', bg: '#FEE2E2', urgency: 'red' as const };
+  const totalMins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  if (hrs >= 4) return { label, color: '#059669', bg: '#D1FAE5', urgency: 'green' as const };
+  if (hrs >= 2) return { label, color: '#D97706', bg: '#FEF3C7', urgency: 'yellow' as const };
+  return { label, color: '#DC2626', bg: '#FEE2E2', urgency: 'red' as const };
+};
+
 /* ─── Mock data ─────────────────────────────────────────────── */
+const BASE = Date.now();
+const H    = 3600000;
+
 const INIT_PICKUPS: PickupRequest[] = [
-  { id:'1', foodTitle:'Cooked Biryani (25 kg)',   donor:'Sunshine Hotel',  address:'12 MG Road, Bengaluru',     distance:'0.8 km', weight:'25 kg',  expiryIn:'2 hrs', ngo:'Helping Hands NGO',    ngoAddress:'44 Residency Rd',    status:'available',  category:'Cooked Food' },
-  { id:'2', foodTitle:'Fresh Bread (10 kg)',       donor:'City Bakery',     address:'5 Park St, Bengaluru',      distance:'1.4 km', weight:'10 kg',  expiryIn:'4 hrs', ngo:'City Care Foundation', ngoAddress:'8 Brigade Rd',       status:'available',  category:'Bakery' },
-  { id:'3', foodTitle:'Mixed Vegetables (15 kg)',  donor:'Fresh Mart',      address:'88 Church St, Bengaluru',   distance:'2.1 km', weight:'15 kg',  expiryIn:'6 hrs', ngo:'Green Hope Trust',     ngoAddress:'16 Commercial St',   status:'accepted',   category:'Produce' },
-  { id:'4', foodTitle:'Dal & Rice (30 servings)',  donor:'Hotel Grandeur',  address:'4 Infantry Rd, Bengaluru',  distance:'3.5 km', weight:'30 srv', expiryIn:'1 hr',  ngo:'Annadanam Trust',      ngoAddress:'Majestic Bus Stand', status:'available',  category:'Cooked Food' },
-  { id:'5', foodTitle:'Fruit Platter (8 kg)',      donor:'Grand Catering',  address:'22 Lavelle Rd, Bengaluru',  distance:'2.8 km', weight:'8 kg',   expiryIn:'5 hrs', ngo:'Hope Foundation',      ngoAddress:'Freedom Park',       status:'in-transit', category:'Fruits' },
-  { id:'6', foodTitle:'Dairy Products (20 L)',     donor:'Amul Booth',      address:'7 Linking Rd, Bengaluru',   distance:'1.1 km', weight:'20 L',   expiryIn:'3 hrs', ngo:'Smile Foundation',     ngoAddress:'Cubbon Park Gate',   status:'completed',  category:'Dairy' },
+  { id:'1', foodTitle:'Cooked Biryani (25 kg)',   donor:'Sunshine Hotel',  address:'12 MG Road, Bengaluru',     distance:'0.8 km', weight:'25 kg',  expiryIn:'2 hrs', expiryTimestamp: BASE + 2*H,    ngoWindowEnd: BASE - 1*H,    ngo:'Helping Hands NGO',    ngoAddress:'44 Residency Rd',    status:'available',  category:'Cooked Food' },
+  { id:'2', foodTitle:'Fresh Bread (10 kg)',       donor:'City Bakery',     address:'5 Park St, Bengaluru',      distance:'1.4 km', weight:'10 kg',  expiryIn:'4 hrs', expiryTimestamp: BASE + 4*H,    ngoWindowEnd: BASE - 0.5*H,  ngo:'City Care Foundation', ngoAddress:'8 Brigade Rd',       status:'available',  category:'Bakery' },
+  { id:'3', foodTitle:'Mixed Vegetables (15 kg)',  donor:'Fresh Mart',      address:'88 Church St, Bengaluru',   distance:'2.1 km', weight:'15 kg',  expiryIn:'6 hrs', expiryTimestamp: BASE + 6*H,    ngoWindowEnd: BASE + 1.5*H,  ngo:'Green Hope Trust',     ngoAddress:'16 Commercial St',   status:'accepted',   category:'Produce' },
+  { id:'4', foodTitle:'Dal & Rice (30 servings)',  donor:'Hotel Grandeur',  address:'4 Infantry Rd, Bengaluru',  distance:'3.5 km', weight:'30 srv', expiryIn:'1 hr',  expiryTimestamp: BASE + 1*H,    ngoWindowEnd: BASE - 2*H,    ngo:'Annadanam Trust',      ngoAddress:'Majestic Bus Stand', status:'available',  category:'Cooked Food' },
+  { id:'5', foodTitle:'Fruit Platter (8 kg)',      donor:'Grand Catering',  address:'22 Lavelle Rd, Bengaluru',  distance:'2.8 km', weight:'8 kg',   expiryIn:'5 hrs', expiryTimestamp: BASE + 5*H,    ngoWindowEnd: BASE - 1*H,    ngo:'Hope Foundation',      ngoAddress:'Freedom Park',       status:'in-transit', category:'Fruits' },
+  { id:'6', foodTitle:'Dairy Products (20 L)',     donor:'Amul Booth',      address:'7 Linking Rd, Bengaluru',   distance:'1.1 km', weight:'20 L',   expiryIn:'3 hrs', expiryTimestamp: BASE + 3*H,    ngoWindowEnd: BASE - 3*H,    ngo:'Smile Foundation',     ngoAddress:'Cubbon Park Gate',   status:'completed',  category:'Dairy' },
 ];
 
 const EMOJI_MAP: Record<string, string> = {
@@ -66,13 +84,30 @@ const VolunteerDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pickups, setPickups]   = useState<PickupRequest[]>(INIT_PICKUPS);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [now, setNow]           = useState(Date.now());
 
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'VL';
   const displayName = user?.name || 'Volunteer';
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
+  /* Live countdown - updates every 30s */
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const verificationStatus = user?.verificationStatus ?? 'pending'; // default pending for demo
+  const isVerified         = verificationStatus === 'verified';
+
+  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); };
 
   const handleAccept = (id: string) => {
+    if (!isVerified) {
+      const activeCount = pickups.filter(p => p.status === 'accepted' || p.status === 'in-transit').length;
+      if (activeCount >= 3) {
+        showToast('⚠️ Unverified volunteers can accept up to 3 pickups. Verification is pending admin review.');
+        return;
+      }
+    }
     setPickups(prev => prev.map(p => p.id===id ? {...p, status:'accepted'} : p));
     showToast('Pickup accepted! Head to the donor location.');
     setTab('active');
@@ -93,15 +128,19 @@ const VolunteerDashboard: React.FC = () => {
 
   /* Stats */
   const stats = {
-    available:  pickups.filter(p => p.status==='available').length,
+    available:  pickups.filter(p => p.status==='available' && p.ngoWindowEnd <= now).length,
     accepted:   pickups.filter(p => p.status==='accepted').length,
     inTransit:  pickups.filter(p => p.status==='in-transit').length,
     completed:  pickups.filter(p => p.status==='completed').length,
   };
 
   const activePickups    = pickups.filter(p => p.status==='accepted' || p.status==='in-transit');
-  const availablePickups = pickups.filter(p => p.status==='available');
+  const availablePickups = pickups.filter(p => p.status==='available' && p.ngoWindowEnd <= now);
+  const ngoPriorityPickups = pickups.filter(p => p.status==='available' && p.ngoWindowEnd > now);
   const completedPickups = pickups.filter(p => p.status==='completed');
+
+  /* Mock rating data (would come from backend in production) */
+  const myRating = { average: 4.8, count: completedPickups.length + 3, totalKg: 127 };
 
   /* Charts */
   const barData = {
@@ -221,6 +260,54 @@ const VolunteerDashboard: React.FC = () => {
 
         <div className="db-content">
 
+          {/* ════ VERIFICATION BANNER ════ */}
+          {verificationStatus !== 'verified' && (
+            <div style={{
+              marginBottom: 20,
+              padding: '14px 20px',
+              borderRadius: 'var(--r-md)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              background: verificationStatus === 'rejected' ? '#FEE2E2' : '#FFF7ED',
+              border: `1.5px solid ${verificationStatus === 'rejected' ? '#FCA5A5' : '#FED7AA'}`,
+            }}>
+              <div style={{ fontSize:'1.5rem', flexShrink:0 }}>
+                {verificationStatus === 'rejected' ? '❌' : '⏳'}
+              </div>
+              <div style={{ flex:1 }}>
+                {verificationStatus === 'pending' && (
+                  <>
+                    <div style={{ fontWeight:700, color:'#92400E', fontSize:'0.9rem' }}>
+                      Verification Pending — Limited Access
+                    </div>
+                    <div style={{ fontSize:'0.8rem', color:'#B45309', marginTop:2 }}>
+                      Your ID is under admin review. You can accept up to <strong>3 pickups</strong> until verified. Verified volunteers have unlimited access.
+                    </div>
+                  </>
+                )}
+                {verificationStatus === 'rejected' && (
+                  <>
+                    <div style={{ fontWeight:700, color:'#991B1B', fontSize:'0.9rem' }}>
+                      Verification Rejected
+                    </div>
+                    <div style={{ fontSize:'0.8rem', color:'#B91C1C', marginTop:2 }}>
+                      Your verification was rejected. Please contact support or re-register with a valid ID to unlock full access.
+                    </div>
+                  </>
+                )}
+              </div>
+              <div style={{
+                padding:'4px 12px', borderRadius:999,
+                background: verificationStatus === 'rejected' ? '#FCA5A5' : '#FED7AA',
+                color: verificationStatus === 'rejected' ? '#991B1B' : '#92400E',
+                fontSize:'0.72rem', fontWeight:700, flexShrink:0,
+              }}>
+                {verificationStatus === 'pending' ? 'PENDING' : 'REJECTED'}
+              </div>
+            </div>
+          )}
+
           {/* ════ NEARBY PICKUPS ════ */}
           {tab==='pickups' && (
             <>
@@ -250,43 +337,120 @@ const VolunteerDashboard: React.FC = () => {
                 ))}
               </div>
 
-              {availablePickups.length === 0
+              {availablePickups.length === 0 && ngoPriorityPickups.length === 0
                 ? <div className="db-empty-state"><i className="fas fa-map-pin"></i><p>No pickup requests near you right now.</p></div>
                 : (
-                  <div className="pickup-cards-grid">
-                    {availablePickups.map(p => (
-                      <div className="pickup-card" key={p.id}>
-                        <div className="pickup-card-header">
-                          <div>
-                            <div className="pickup-card-title">{EMOJI_MAP[p.category]||'🍽️'} {p.foodTitle}</div>
-                            <div style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginTop:4 }}>
-                              <i className="fas fa-store" style={{ marginRight:5 }}></i>{p.donor}
-                            </div>
+                  <>
+                    {/* NGO Priority Window pickups */}
+                    {ngoPriorityPickups.length > 0 && (
+                      <div style={{ marginBottom:24 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                          <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(139,92,246,0.12)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <i className="fas fa-building" style={{ color:'#8B5CF6', fontSize:'0.9rem' }}></i>
                           </div>
-                          <span className={`db-badge ${STATUS_COLORS[p.status]}`}>{p.status}</span>
+                          <div>
+                            <div style={{ fontWeight:700, fontSize:'0.9rem', color:'#6D28D9' }}>NGO Priority Window</div>
+                            <div style={{ fontSize:'0.75rem', color:'#8B5CF6' }}>These requests are reserved for NGOs. They'll be released to volunteers after the window expires.</div>
+                          </div>
                         </div>
-
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'12px 0' }}>
-                          <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{p.address.split(',')[0]}</span>
-                          <span className="donation-meta-item"><i className="fas fa-route"></i>{p.distance}</span>
-                          <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{p.weight}</span>
-                          <span className="donation-meta-item"><i className="fas fa-clock"></i>Expires in {p.expiryIn}</span>
-                        </div>
-
-                        <div style={{ background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.15)', borderRadius:'var(--r-md)', padding:'10px 14px', marginBottom:14, fontSize:'0.82rem' }}>
-                          <i className="fas fa-building" style={{ color:'var(--c-accent)', marginRight:6 }}></i>
-                          <strong>Deliver to:</strong> {p.ngo} — {p.ngoAddress}
-                        </div>
-
-                        <div className="pickup-card-actions">
-                          <button className="db-btn db-btn-primary" style={{ flex:1 }} onClick={() => handleAccept(p.id)}>
-                            <i className="fas fa-hand-point-up"></i> Accept Pickup
-                          </button>
-                          <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-map"></i></button>
+                        <div className="pickup-cards-grid">
+                          {ngoPriorityPickups.map(p => {
+                            const windowLeft = calcExpiry(p.ngoWindowEnd, now);
+                            return (
+                              <div className="pickup-card" key={p.id} style={{ opacity:0.7, border:'1.5px solid rgba(139,92,246,0.25)' }}>
+                                <div className="pickup-card-header">
+                                  <div>
+                                    <div className="pickup-card-title">{EMOJI_MAP[p.category]||'🍽️'} {p.foodTitle}</div>
+                                    <div style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginTop:4 }}>
+                                      <i className="fas fa-store" style={{ marginRight:5 }}></i>{p.donor}
+                                    </div>
+                                  </div>
+                                  <span className="db-badge" style={{ background:'rgba(139,92,246,0.12)', color:'#6D28D9' }}>NGO Priority</span>
+                                </div>
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'12px 0' }}>
+                                  <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{p.address.split(',')[0]}</span>
+                                  <span className="donation-meta-item"><i className="fas fa-route"></i>{p.distance}</span>
+                                  <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{p.weight}</span>
+                                </div>
+                                <div style={{ background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.15)', borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'0.82rem', color:'#6D28D9' }}>
+                                  <i className="fas fa-clock" style={{ marginRight:6 }}></i>
+                                  <strong>Available for you in:</strong> {windowLeft.label}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+
+                    {/* Available pickups */}
+                    {availablePickups.length > 0 && (
+                      <div className="pickup-cards-grid">
+                        {availablePickups.map(p => {
+                          const expiry = calcExpiry(p.expiryTimestamp, now);
+                          const activeCount = pickups.filter(pk => pk.status === 'accepted' || pk.status === 'in-transit').length;
+                          const limitReached = !isVerified && activeCount >= 3;
+                          return (
+                            <div className="pickup-card" key={p.id} style={{ borderTop: `3px solid ${expiry.color}` }}>
+                              <div className="pickup-card-header">
+                                <div>
+                                  <div className="pickup-card-title">{EMOJI_MAP[p.category]||'🍽️'} {p.foodTitle}</div>
+                                  <div style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginTop:4 }}>
+                                    <i className="fas fa-store" style={{ marginRight:5 }}></i>{p.donor}
+                                  </div>
+                                </div>
+                                <span className={`db-badge ${STATUS_COLORS[p.status]}`}>{p.status}</span>
+                              </div>
+
+                              {/* Expiry urgency badge */}
+                              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'10px 0 4px' }}>
+                                <span style={{
+                                  display:'inline-flex', alignItems:'center', gap:5,
+                                  padding:'4px 10px', borderRadius:999,
+                                  background: expiry.bg, color: expiry.color,
+                                  fontSize:'0.75rem', fontWeight:700,
+                                }}>
+                                  <i className="fas fa-fire" style={{ fontSize:'0.65rem' }}></i>
+                                  {expiry.urgency === 'red' ? '🔴 Urgent:' : expiry.urgency === 'yellow' ? '🟡 Soon:' : '🟢 Fresh:'}
+                                  &nbsp;{expiry.label} left
+                                </span>
+                              </div>
+
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:10, margin:'10px 0' }}>
+                                <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{p.address.split(',')[0]}</span>
+                                <span className="donation-meta-item"><i className="fas fa-route"></i>{p.distance}</span>
+                                <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{p.weight}</span>
+                              </div>
+
+                              <div style={{ background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.15)', borderRadius:'var(--r-md)', padding:'10px 14px', marginBottom:14, fontSize:'0.82rem' }}>
+                                <i className="fas fa-building" style={{ color:'var(--c-accent)', marginRight:6 }}></i>
+                                <strong>Deliver to:</strong> {p.ngo} — {p.ngoAddress}
+                              </div>
+
+                              {limitReached && (
+                                <div style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderRadius:'var(--r-sm)', padding:'8px 12px', marginBottom:10, fontSize:'0.78rem', color:'#92400E' }}>
+                                  <i className="fas fa-lock" style={{ marginRight:6 }}></i>
+                                  Limit reached (3/3). <strong>Verify your account</strong> to accept unlimited pickups.
+                                </div>
+                              )}
+
+                              <div className="pickup-card-actions">
+                                <button
+                                  className="db-btn db-btn-primary"
+                                  style={{ flex:1, opacity: limitReached ? 0.5 : 1 }}
+                                  onClick={() => handleAccept(p.id)}
+                                  disabled={limitReached}
+                                >
+                                  <i className="fas fa-hand-point-up"></i> Accept Pickup
+                                </button>
+                                <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-map"></i></button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )
               }
             </>
@@ -424,10 +588,10 @@ const VolunteerDashboard: React.FC = () => {
 
               <div className="db-stats-row" style={{ marginBottom:28 }}>
                 {[
-                  { ico:'fa-flag-checkered', bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:stats.completed+3, lbl:'Total Deliveries', delta:'All time' },
-                  { ico:'fa-weight-hanging', bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:'127 kg',          lbl:'Food Rescued',     delta:'This month' },
-                  { ico:'fa-route',          bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:'38.4 km',         lbl:'Distance Covered', delta:'All time' },
-                  { ico:'fa-star',           bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:'4.9',             lbl:'Avg. Rating',      delta:'From NGOs' },
+                  { ico:'fa-flag-checkered', bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:myRating.count,          lbl:'Total Deliveries', delta:'All time' },
+                  { ico:'fa-weight-hanging', bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:`${myRating.totalKg} kg`, lbl:'Food Rescued',     delta:'This month' },
+                  { ico:'fa-route',          bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:'38.4 km',               lbl:'Distance Covered', delta:'All time' },
+                  { ico:'fa-star',           bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:myRating.average.toFixed(1), lbl:'Avg. Rating', delta:`From ${myRating.count} deliveries` },
                 ].map((s, i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -440,6 +604,53 @@ const VolunteerDashboard: React.FC = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Rating display card */}
+              <div className="db-card" style={{ marginBottom:24, background:'linear-gradient(135deg,rgba(139,92,246,0.06),rgba(37,99,235,0.06))', border:'1.5px solid rgba(139,92,246,0.2)' }}>
+                <div className="db-card-header">
+                  <div className="db-card-title" style={{ color:'#6D28D9' }}>
+                    <i className="fas fa-star" style={{ color:'#F59E0B' }}></i> My NGO Rating
+                  </div>
+                </div>
+                <div className="db-card-body">
+                  <div style={{ display:'flex', alignItems:'center', gap:28, flexWrap:'wrap' }}>
+                    <div style={{ textAlign:'center' }}>
+                      <div style={{ fontSize:'3.5rem', fontWeight:800, color:'#6D28D9', lineHeight:1 }}>{myRating.average.toFixed(1)}</div>
+                      <div style={{ display:'flex', gap:3, justifyContent:'center', marginTop:6 }}>
+                        {[1,2,3,4,5].map(star => (
+                          <i key={star} className="fas fa-star" style={{
+                            color: star <= Math.round(myRating.average) ? '#F59E0B' : '#E2E8F0',
+                            fontSize:'1.1rem',
+                          }}></i>
+                        ))}
+                      </div>
+                      <div style={{ fontSize:'0.75rem', color:'var(--c-muted)', marginTop:4 }}>out of 5.0</div>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:'0.9rem', fontWeight:600, color:'var(--c-text)', marginBottom:4 }}>
+                        Based on {myRating.count} completed deliveries
+                      </div>
+                      <div style={{ fontSize:'0.82rem', color:'var(--c-muted)', marginBottom:12 }}>
+                        Ratings are given by NGOs after each delivery. Keep up the great work!
+                      </div>
+                      {/* Simulated rating breakdown */}
+                      {[5,4,3,2,1].map(stars => {
+                        const pct = stars === 5 ? 75 : stars === 4 ? 18 : stars === 3 ? 5 : stars === 2 ? 2 : 0;
+                        return (
+                          <div key={stars} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                            <span style={{ fontSize:'0.72rem', color:'var(--c-muted)', width:12 }}>{stars}</span>
+                            <i className="fas fa-star" style={{ color:'#F59E0B', fontSize:'0.65rem' }}></i>
+                            <div style={{ flex:1, height:6, background:'#F1F5F9', borderRadius:999 }}>
+                              <div style={{ width:`${pct}%`, height:'100%', background:'#F59E0B', borderRadius:999 }}></div>
+                            </div>
+                            <span style={{ fontSize:'0.72rem', color:'var(--c-muted)', width:28 }}>{pct}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="db-chart-row">
