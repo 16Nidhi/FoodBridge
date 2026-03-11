@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+
+# Backend/node_modules (explicit)
+backend/node_modules/
+
+# Client/node_modules
+foodbridge/client/node_modules/
+
+# Env files
+.env
+.env.*
+
+# Build output
+dist/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
