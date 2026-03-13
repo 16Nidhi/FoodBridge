@@ -96,4 +96,80 @@ const getStats = async (req, res) => {
     }
 };
 
-module.exports = { getAllUsers, getAllDonations, getStats };
+// ----------------------------
+// @desc   Admin: activate or suspend a user account
+// @route  PATCH /api/admin/users/:id/status
+// @access Private — Admin only
+// ----------------------------
+
+const updateUserStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'inactive', 'suspended'].includes(status)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Status must be "active", "inactive", or "suspended".',
+        });
+    }
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            id,
+            { $set: { isActive: status === 'active' } },
+            { new: true, select: '-password' }
+        );
+
+        if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+        res.status(200).json({ success: true, message: `User status updated to ${status}.`, user });
+    } catch (error) {
+        console.error('Admin update user status error:', error);
+        res.status(500).json({ success: false, message: 'Server error while updating user status.' });
+    }
+};
+
+// ----------------------------
+// @desc   Admin: update a user's verification status (for NGOs / volunteers)
+// @route  PATCH /api/admin/users/:id/verify
+// @access Private — Admin only
+// ----------------------------
+
+const updateUserVerification = async (req, res) => {
+    const { id } = req.params;
+    const { verificationStatus } = req.body;
+
+    if (!['pending', 'approved', 'rejected'].includes(verificationStatus)) {
+        return res.status(400).json({
+            success: false,
+            message: 'verificationStatus must be "pending", "approved", or "rejected".',
+        });
+    }
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            id,
+            { $set: { verificationStatus } },
+            { new: true, select: '-password' }
+        );
+
+        if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+        res.status(200).json({
+            success: true,
+            message: `Verification status for ${user.name} updated to ${verificationStatus}.`,
+            user,
+        });
+    } catch (error) {
+        console.error('Admin update user verification error:', error);
+        res.status(500).json({ success: false, message: 'Server error while updating verification status.' });
+    }
+};
+
+module.exports = {
+    getAllUsers,
+    getAllDonations,
+    getStats,
+    updateUserStatus,
+    updateUserVerification,
+};

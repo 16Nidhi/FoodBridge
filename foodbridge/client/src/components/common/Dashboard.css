@@ -530,6 +530,8 @@
   animation: toastIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
 .db-toast i { color: var(--c-primary); }
+.db-toast-error { background: #7f1d1d; }
+.db-toast-error i { color: #FCA5A5; }
 @keyframes toastIn {
   from { transform: translateY(20px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }

@@ -24,6 +24,20 @@ const donationSchema = new mongoose.Schema(
             trim: true,
         },
 
+        // Optional free-text description provided by the donor
+        description: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+
+        // Category such as "Cooked Food", "Bakery", "Produce", etc.
+        category: {
+            type: String,
+            trim: true,
+            default: 'Other',
+        },
+
         // Quantity description (e.g., "20 servings", "5 kg")
         quantity: {
             type: String,

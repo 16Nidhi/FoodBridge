@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 import './Login.css';
+import api from '../services/api';
 
 const ID_TYPES = [
   { value: 'aadhar',          label: '🪪 Aadhar Card' },
@@ -35,15 +36,38 @@ const Register: React.FC = () => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   /* ── Step 1: basic info ── */
-  const handleStep1 = (e: React.FormEvent) => {
+  const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (form.role === 'volunteer') { setStep(2); }
     else {
-      dispatch(login({ id: Date.now().toString(), name: form.name, role: form.role }));
-      navigate('/dashboard');
+      setLoading(true);
+      try {
+        const res = await api.post('/auth/register', {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          phone: form.phone,
+        });
+        const { token, user } = res.data;
+        localStorage.setItem('token', token);
+        dispatch(login({
+          id: user._id,
+          name: user.name,
+          role: user.role,
+          verificationStatus: user.verificationStatus,
+          email: user.email,
+          phone: user.phone,
+        }));
+        navigate(`/${user.role}-dashboard`);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Registration failed');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -86,16 +110,32 @@ const Register: React.FC = () => {
     if (!idFile) { setError('Please upload a valid ID document.'); return; }
     if (!form.idNumber.trim()) { setError('Please enter your ID number.'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800)); // simulate API
-    dispatch(login({
-      id: Date.now().toString(),
-      name: form.name,
-      role: 'volunteer',
-      verificationStatus: 'pending',
-      phone: form.phone,
-    }));
-    setLoading(false);
-    navigate('/dashboard');
+    try {
+      const res = await api.post('/auth/register', {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        phone: form.phone,
+        idType: form.idType,
+        idNumber: form.idNumber,
+      });
+      const { token, user } = res.data;
+      localStorage.setItem('token', token);
+      dispatch(login({
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        verificationStatus: user.verificationStatus,
+        email: user.email,
+        phone: user.phone || form.phone,
+      }));
+      navigate(`/${user.role}-dashboard`);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ── Step indicators ── */

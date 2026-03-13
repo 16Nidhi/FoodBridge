@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
+import {
+  adminGetStats, adminGetUsers, adminGetDonations, adminGetVerifications,
+  adminReviewVerification, adminUpdateUserStatus, adminUpdateUserVerification,
+} from '../../services/api';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
@@ -53,43 +57,13 @@ interface VolunteerVerification {
 }
 
 /* ─── Mock data ─────────────────────────────────────────────── */
-const MOCK_USERS: AppUser[] = [
-  { id:'1', name:'Rajesh Sharma',     email:'rajesh@foodco.in',   role:'donor',     joinDate:'2025-12-01', status:'active',    donations:23, location:'Bengaluru' },
-  { id:'2', name:'Priya Singh',       email:'priya@helpngo.org',  role:'ngo',       joinDate:'2025-11-15', status:'active',    donations:0,  location:'Mumbai' },
-  { id:'3', name:'Ananya Verma',      email:'ananya@gmail.com',   role:'volunteer', joinDate:'2026-01-05', status:'active',    pickups:17,   location:'Delhi' },
-  { id:'4', name:'Hotel Grandeur',    email:'ops@grandeur.com',   role:'donor',     joinDate:'2025-10-20', status:'active',    donations:51, location:'Bengaluru' },
-  { id:'5', name:'City Bakery',       email:'info@citybakery.in', role:'donor',     joinDate:'2025-09-11', status:'inactive',  donations:8,  location:'Kolkata' },
-  { id:'6', name:'Feeding India',     email:'mail@feedindia.org', role:'ngo',       joinDate:'2025-08-30', status:'suspended', donations:0,  location:'Chennai' },
-  { id:'7', name:'Karan Mehta',       email:'karan@gmail.com',    role:'volunteer', joinDate:'2026-02-14', status:'active',    pickups:9,    location:'Mumbai' },
-  { id:'8', name:'Fresh Mart',        email:'fresh@mart.co',      role:'donor',     joinDate:'2026-01-22', status:'active',    donations:14, location:'Hyderabad' },
-  { id:'9', name:'Green Hope Trust',  email:'info@greenhope.org', role:'ngo',       joinDate:'2025-12-10', status:'active',    donations:0,  location:'Bengaluru' },
-  { id:'10',name:'Sunita Patel',      email:'sunita@gmail.com',   role:'volunteer', joinDate:'2026-03-01', status:'active',    pickups:4,    location:'Pune' },
-];
+const MOCK_USERS: AppUser[] = [];
 
-const MOCK_NGO_REGISTRATIONS: NgoRegistration[] = [
-  { id:'n1', orgName:'Hope Feeds',         contactName:'Arun Kumar',    email:'arun@hopefeeds.org',    phone:'+91-9812345678', location:'Hyderabad', description:'Distributing food to urban poor families across Hyderabad.', appliedDate:'2026-03-07', approvalStatus:'pending' },
-  { id:'n2', orgName:'Nourish India',      contactName:'Meera Joshi',   email:'meera@nourishindia.in', phone:'+91-9723456789', location:'Pune',      description:'Community kitchen serving 200+ meals daily to homeless.', appliedDate:'2026-03-06', approvalStatus:'pending' },
-  { id:'n3', orgName:'FoodCare Trust',     contactName:'Sanjay Desai',  email:'info@foodcare.org',     phone:'+91-9634567890', location:'Surat',     description:'Food redistribution NGO working with local temples.', appliedDate:'2026-03-05', approvalStatus:'approved' },
-  { id:'n4', orgName:'Helping Hands NGO',  contactName:'Lakshmi Nair',  email:'lnair@helpinghands.in', phone:'+91-9545678901', location:'Kochi',     description:'Providing meals to elderly care homes and orphanages.', appliedDate:'2026-03-04', approvalStatus:'rejected' },
-];
+const MOCK_NGO_REGISTRATIONS: NgoRegistration[] = [];
 
-const MOCK_DELIVERIES: PlatformDelivery[] = [
-  { id:'del1', item:'Cooked Biryani',  donor:'Sunshine Hotel',  ngo:'Green Hope Trust', volunteer:'Ananya Verma', quantity:'25 kg',       date:'2026-03-09', status:'en_route' },
-  { id:'del2', item:'Fresh Bread',     donor:'City Bakery',     ngo:'Priya Singh',      volunteer:'Raj Kumar',    quantity:'10 kg',       date:'2026-03-09', status:'delivered' },
-  { id:'del3', item:'Mixed Vegetables',donor:'Fresh Mart',      ngo:'Feeding India',    volunteer:'Karan Mehta',  quantity:'15 kg',       date:'2026-03-09', status:'picked_up' },
-  { id:'del4', item:'Dal & Rice',      donor:'Hotel Grandeur',  ngo:'Green Hope Trust', volunteer:'Sunita Patel', quantity:'30 servings', date:'2026-03-08', status:'delivered' },
-  { id:'del5', item:'Fruit Platter',   donor:'Grand Catering',  ngo:'Priya Singh',      volunteer:'Arjun Mehta',  quantity:'8 kg',        date:'2026-03-08', status:'assigned' },
-  { id:'del6', item:'Dairy Products',  donor:'Amul Booth',      ngo:'Feeding India',    volunteer:'Raj Kumar',    quantity:'20 litres',   date:'2026-03-07', status:'delivered' },
-  { id:'del7', item:'Packaged Biscuits',donor:'Parle Foods',    ngo:'Green Hope Trust', volunteer:'Ananya Verma', quantity:'50 boxes',    date:'2026-03-07', status:'cancelled' },
-];
+const MOCK_DELIVERIES: PlatformDelivery[] = [];
 
-const MOCK_VERIFICATIONS: VolunteerVerification[] = [
-  { id:'vv1', name:'Ramesh Nair',    email:'ramesh@gmail.com',   phone:'+91-9812345678', idType:'aadhar',          idNumber:'XXXX-XXXX-3421', location:'Bengaluru', appliedDate:'2026-03-09', pickupsCompleted:2, status:'pending'  },
-  { id:'vv2', name:'Sneha Patil',    email:'sneha@outlook.com',  phone:'+91-9723456789', idType:'student_id',      idNumber:'VIT-2023-0891',  location:'Pune',      appliedDate:'2026-03-08', pickupsCompleted:1, status:'pending'  },
-  { id:'vv3', name:'Deepak Joshi',   email:'deepak@yahoo.com',   phone:'+91-9634567890', idType:'driving_license', idNumber:'KA-03-20230012', location:'Bengaluru', appliedDate:'2026-03-07', pickupsCompleted:3, status:'pending'  },
-  { id:'vv4', name:'Meena Agarwal',  email:'meena@gmail.com',    phone:'+91-9545678901', idType:'aadhar',          idNumber:'XXXX-XXXX-7782', location:'Mumbai',    appliedDate:'2026-03-06', pickupsCompleted:2, status:'verified' },
-  { id:'vv5', name:'Farhan Shaikh',  email:'farhan@gmail.com',   phone:'+91-9456789012', idType:'student_id',      idNumber:'MU-UNIV-1029',   location:'Mumbai',    appliedDate:'2026-03-05', pickupsCompleted:0, status:'rejected' },
-];
+const MOCK_VERIFICATIONS: VolunteerVerification[] = [];
 
 const MONTHS = ['Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
 
@@ -116,30 +90,137 @@ const AdminDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers]         = useState<AppUser[]>(MOCK_USERS);
   const [ngoRegistrations, setNgoRegistrations] = useState<NgoRegistration[]>(MOCK_NGO_REGISTRATIONS);
-  const [deliveries]              = useState<PlatformDelivery[]>(MOCK_DELIVERIES);
+  const [deliveries, setDeliveries] = useState<PlatformDelivery[]>(MOCK_DELIVERIES);
   const [volunteerVerifications, setVolunteerVerifications] = useState<VolunteerVerification[]>(MOCK_VERIFICATIONS);
   const [roleFilter, setRoleFilter] = useState<'all'|UserRole>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [toastMsg, setToastMsg]   = useState<string | null>(null);
+  const [toastMsg, setToastMsg]       = useState<string | null>(null);
+  const [toastType, setToastType]     = useState<'success'|'error'>('success');
+  const [loading, setLoading]         = useState(false);
+  const [apiError, setApiError]       = useState<string|null>(null);
+  const [actionLoading, setActionLoading] = useState<Record<string,boolean>>({});
+  const [apiStats, setApiStats]       = useState<any>(null);
 
   const displayName = user?.name || 'Admin';
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'AD';
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  const showToast = (msg: string, type: 'success'|'error' = 'success') => {
+    setToastMsg(msg); setToastType(type); setTimeout(() => setToastMsg(null), 3500);
+  };
+  const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
-  const handleStatusChange = (id: string, status: UserStatus) =>
-    setUsers(prev => prev.map(u => u.id===id ? {...u, status} : u));
+  /* ── API fetch on mount ── */
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setLoading(true);
+    Promise.all([
+      adminGetStats(),
+      adminGetUsers(),
+      adminGetDonations(),
+      adminGetVerifications(),
+    ])
+      .then(([statsRes, usersRes, donationsRes, verifsRes]) => {
+        setApiStats(statsRes.data.stats);
+        setUsers(usersRes.data.users.map((u: any): AppUser => ({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          joinDate: new Date(u.createdAt).toISOString().slice(0, 10),
+          status: u.status || 'active',
+          location: u.location || '—',
+        })));
+        setNgoRegistrations(
+          usersRes.data.users
+            .filter((u: any) => u.role === 'ngo')
+            .map((u: any): NgoRegistration => ({
+              id: u._id,
+              orgName: u.name,
+              contactName: u.name,
+              email: u.email,
+              phone: '—',
+              location: u.location || '—',
+              description: '—',
+              appliedDate: new Date(u.createdAt).toISOString().slice(0, 10),
+              approvalStatus: u.verificationStatus === 'approved' ? 'approved'
+                : u.verificationStatus === 'rejected' ? 'rejected' : 'pending',
+            }))
+        );
+        setDeliveries(donationsRes.data.donations.map((d: any): PlatformDelivery => ({
+          id: d._id,
+          item: d.foodType,
+          donor: d.donorId?.name || '—',
+          ngo: d.assignedNGO?.name || '—',
+          volunteer: d.assignedVolunteer?.name || '—',
+          quantity: d.quantity,
+          date: new Date(d.updatedAt || d.createdAt).toISOString().slice(0, 10),
+          status: d.status === 'picked_up' ? 'picked_up'
+            : d.status === 'delivered' ? 'delivered'
+            : d.status === 'expired' ? 'cancelled'
+            : d.status === 'accepted' ? 'assigned'
+            : 'assigned',
+        })));
+        setVolunteerVerifications(verifsRes.data.verifications.map((v: any): VolunteerVerification => ({
+          id: v._id,
+          name: v.userId?.name || 'Unknown',
+          email: v.userId?.email || '',
+          phone: '—',
+          idType: 'aadhar',
+          idNumber: v.idDocument?.slice(-8) || '—',
+          location: v.userId?.location || '—',
+          appliedDate: new Date(v.createdAt).toISOString().slice(0, 10),
+          pickupsCompleted: 0,
+          status: v.status === 'approved' ? 'verified' : v.status === 'rejected' ? 'rejected' : 'pending',
+        })));
+      })
+      .catch((err: any) => setApiError(err.response?.data?.message || 'Failed to load dashboard data'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const handleNgoApproval = (id: string, status: NgoApprovalStatus) => {
-    setNgoRegistrations(prev => prev.map(r => r.id===id ? {...r, approvalStatus:status} : r));
-    showToast(status === 'approved' ? 'NGO registration approved!' : 'NGO registration rejected.');
+  const handleStatusChange = async (id: string, status: UserStatus) => {
+    const key = id + ':status';
+    setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      await adminUpdateUserStatus(id, status === 'active' ? 'active' : 'suspended');
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u));
+      showToast(`User status updated to ${status}`);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to update status', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
   };
 
-  const handleVerifAction = (id: string, status: VerifStatus) => {
-    setVolunteerVerifications(prev => prev.map(v => v.id===id ? {...v, status} : v));
-    const v = volunteerVerifications.find(v => v.id === id);
-    if (v) showToast(status === 'verified' ? `✅ ${v.name} is now a verified volunteer!` : `❌ ${v.name}'s verification rejected.`);
+  const handleNgoApproval = async (id: string, status: NgoApprovalStatus) => {
+    const key = id + ':ngo';
+    setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      await adminUpdateUserVerification(id, status === 'approved' ? 'approved' : 'rejected');
+      setNgoRegistrations(prev => prev.map(r => r.id === id ? { ...r, approvalStatus: status } : r));
+      showToast(status === 'approved' ? 'NGO registration approved!' : 'NGO registration rejected.');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to update NGO status', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleVerifAction = async (id: string, status: VerifStatus) => {
+    const key = id + ':verif';
+    setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      await adminReviewVerification(id, status === 'verified' ? 'approved' : 'rejected');
+      setVolunteerVerifications(prev => prev.map(v => v.id === id ? { ...v, status } : v));
+      const v = volunteerVerifications.find(v => v.id === id);
+      showToast(status === 'verified'
+        ? `${v?.name} is now a verified volunteer!`
+        : `${v?.name}'s verification rejected.`);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to update verification', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
   };
 
   /* Computed */
@@ -148,12 +229,12 @@ const AdminDashboard: React.FC = () => {
   const ngos       = users.filter(u => u.role==='ngo');
   const activeCount= users.filter(u => u.status==='active').length;
 
-  const totalDonations = donors.reduce((a,u) => a + (u.donations||0), 0);
-  const totalPickups   = volunteers.reduce((a,u) => a + (u.pickups||0), 0);
-  const pendingNgos    = ngoRegistrations.filter(r => r.approvalStatus === 'pending').length;
-  const pendingVerifs  = volunteerVerifications.filter(v => v.status === 'pending').length;
-  const totalDeliveries = deliveries.length;
-  const completedDeliveries = deliveries.filter(d => d.status === 'delivered').length;
+  const totalDonations      = apiStats?.totalDonations     ?? donors.reduce((a,u) => a + (u.donations||0), 0);
+  const totalPickups        = volunteers.reduce((a,u) => a + (u.pickups||0), 0);
+  const pendingNgos         = ngoRegistrations.filter(r => r.approvalStatus === 'pending').length;
+  const pendingVerifs       = (apiStats?.pendingVerifications) ?? volunteerVerifications.filter(v => v.status === 'pending').length;
+  const totalDeliveries     = apiStats?.totalDonations     ?? deliveries.length;
+  const completedDeliveries = apiStats?.deliveredDonations ?? deliveries.filter(d => d.status === 'delivered').length;
 
   const filteredUsers = users
     .filter(u => roleFilter==='all' || u.role===roleFilter)
@@ -252,13 +333,13 @@ const AdminDashboard: React.FC = () => {
                 <td>
                   <div style={{ display:'flex', gap:6 }}>
                     {u.status !== 'active' && (
-                      <button className="db-btn db-btn-success db-btn-sm" onClick={() => handleStatusChange(u.id,'active')}>
-                        <i className="fas fa-check"></i>
+                      <button className="db-btn db-btn-success db-btn-sm" disabled={!!actionLoading[u.id+':status']} onClick={() => handleStatusChange(u.id,'active')}>
+                        {actionLoading[u.id+':status'] ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
                       </button>
                     )}
                     {u.status !== 'suspended' && (
-                      <button className="db-btn db-btn-danger db-btn-sm" onClick={() => handleStatusChange(u.id,'suspended')}>
-                        <i className="fas fa-ban"></i>
+                      <button className="db-btn db-btn-danger db-btn-sm" disabled={!!actionLoading[u.id+':status']} onClick={() => handleStatusChange(u.id,'suspended')}>
+                        {actionLoading[u.id+':status'] ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-ban"></i>}
                       </button>
                     )}
                   </div>
@@ -345,6 +426,23 @@ const AdminDashboard: React.FC = () => {
 
         <div className="db-content">
 
+          {/* Loading / error banners */}
+          {loading && (
+            <div style={{ textAlign:'center', padding:'40px 0', color:'var(--c-muted)' }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize:'1.6rem', marginBottom:10 }}></i>
+              <p>Loading dashboard data…</p>
+            </div>
+          )}
+          {apiError && (
+            <div className="db-card" style={{ marginBottom:20, border:'1.5px solid rgba(239,68,68,0.4)', background:'rgba(254,242,242,0.9)' }}>
+              <div className="db-card-body" style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <i className="fas fa-circle-exclamation" style={{ color:'#EF4444', fontSize:'1.1rem' }}></i>
+                <span style={{ color:'#B91C1C', fontSize:'0.9rem' }}>{apiError}</span>
+                <button className="db-btn db-btn-sm" style={{ marginLeft:'auto', background:'#EF4444', color:'#fff' }} onClick={() => setApiError(null)}>Dismiss</button>
+              </div>
+            </div>
+          )}
+
           {/* ════ OVERVIEW ════ */}
           {tab==='overview' && (
             <>
@@ -355,10 +453,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row">
                 {[
-                  { ico:'fa-users',        bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:users.length,      lbl:'Total Users',       delta:activeCount + ' active' },
-                  { ico:'fa-box-open',     bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:totalDonations,    lbl:'Total Donations',   delta:'All food listed' },
-                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:totalDeliveries,   lbl:'Total Deliveries',  delta:completedDeliveries + ' completed' },
-                  { ico:'fa-seedling',     bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:'532 kg',          lbl:'Food Rescued',      delta:'Saved from waste' },
+                  { ico:'fa-users',        bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num: apiStats?.totalUsers ?? users.length,            lbl:'Total Users',       delta:activeCount + ' active' },
+                  { ico:'fa-box-open',     bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num: apiStats?.totalDonations ?? totalDonations,       lbl:'Total Donations',   delta:'All food listed' },
+                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num: totalDeliveries,                                  lbl:'Total Deliveries',  delta:completedDeliveries + ' completed' },
+                  { ico:'fa-seedling',     bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num: apiStats?.activeDonations != null ? apiStats.activeDonations + ' active' : '532 kg', lbl:'Food Rescued', delta:'Saved from waste' },
                 ].map((s, i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -549,11 +647,11 @@ const AdminDashboard: React.FC = () => {
                             <div style={{ fontSize:'0.82rem', color:'#475569', marginTop:8, fontStyle:'italic' }}>"{reg.description}"</div>
                           </div>
                           <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                            <button className="db-btn db-btn-success db-btn-sm" onClick={() => handleNgoApproval(reg.id,'approved')}>
-                              <i className="fas fa-check"></i> Approve
+                            <button className="db-btn db-btn-success db-btn-sm" disabled={!!actionLoading[reg.id+':ngo']} onClick={() => handleNgoApproval(reg.id,'approved')}>
+                              {actionLoading[reg.id+':ngo'] ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-check"></i> Approve</>}
                             </button>
-                            <button className="db-btn db-btn-danger db-btn-sm" onClick={() => handleNgoApproval(reg.id,'rejected')}>
-                              <i className="fas fa-times"></i> Reject
+                            <button className="db-btn db-btn-danger db-btn-sm" disabled={!!actionLoading[reg.id+':ngo']} onClick={() => handleNgoApproval(reg.id,'rejected')}>
+                              {actionLoading[reg.id+':ngo'] ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-times"></i> Reject</>}
                             </button>
                           </div>
                         </div>
@@ -748,16 +846,18 @@ const AdminDashboard: React.FC = () => {
                           <button
                             className="db-btn db-btn-sm"
                             style={{ background:'#10B981', color:'#fff', width:'100%' }}
+                            disabled={!!actionLoading[v.id+':verif']}
                             onClick={() => handleVerifAction(v.id, 'verified')}
                           >
-                            <i className="fas fa-circle-check"></i> Approve
+                            {actionLoading[v.id+':verif'] ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-circle-check"></i> Approve</>}
                           </button>
                           <button
                             className="db-btn db-btn-sm"
                             style={{ background:'#EF4444', color:'#fff', width:'100%' }}
+                            disabled={!!actionLoading[v.id+':verif']}
                             onClick={() => handleVerifAction(v.id, 'rejected')}
                           >
-                            <i className="fas fa-circle-xmark"></i> Reject
+                            {actionLoading[v.id+':verif'] ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-circle-xmark"></i> Reject</>}
                           </button>
                         </div>
                       </div>
@@ -841,9 +941,11 @@ const AdminDashboard: React.FC = () => {
         </div>
       </main>
 
-      {toastMsg && <div className="db-toast"><i className="fas fa-circle-check"></i> {toastMsg}</div>}
+      {toastMsg && <div className={`db-toast${toastType === 'error' ? ' db-toast-error' : ''}`}><i className={`fas ${toastType === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i> {toastMsg}</div>}
     </div>
   );
 };
 
 export default AdminDashboard;
+
+

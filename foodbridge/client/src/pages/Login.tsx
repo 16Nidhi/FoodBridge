@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 import './Login.css';
+import api from '../services/api';
 
 // Demo role credentials so reviewers can jump straight to each dashboard
 const DEMO_CREDENTIALS: Record<string, { id: string; name: string; role: string }> = {
@@ -19,16 +20,32 @@ const Login: React.FC = () => {
   const dispatch   = useDispatch();
   const navigate   = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const match = DEMO_CREDENTIALS[email.toLowerCase()];
-    if (!match) {
-      setError('No account found. Try a demo email listed below.');
-      return;
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      const { token, user } = res.data;
+      localStorage.setItem('token', token);
+      dispatch(login({
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        verificationStatus: user.verificationStatus,
+        email: user.email,
+        phone: user.phone,
+      }));
+      navigate(`/${user.role}-dashboard`);
+    } catch (err: any) {
+      // Fallback to demo credentials for quick previews
+      const match = DEMO_CREDENTIALS[email.toLowerCase()];
+      if (match) {
+        dispatch(login(match));
+        navigate(`/${match.role}-dashboard`);
+        return;
+      }
+      setError(err.response?.data?.message || 'Login failed.');
     }
-    dispatch(login(match));
-    navigate('/dashboard');
   };
 
   return (

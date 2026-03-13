@@ -36,7 +36,7 @@ const openExpiredDonationsToVolunteers = async () => {
 // ----------------------------
 
 const createDonation = async (req, res) => {
-    const { foodType, quantity, location, preparedTime } = req.body;
+    const { foodType, quantity, location, preparedTime, description, category } = req.body;
 
     if (!foodType || !quantity || !location || !preparedTime) {
         return res.status(400).json({
@@ -53,6 +53,8 @@ const createDonation = async (req, res) => {
             location,
             preparedTime: new Date(preparedTime),
             donorId: req.user._id,
+            description: description || '',
+            category: category || 'Other',
         });
 
         res.status(201).json({
@@ -283,11 +285,65 @@ const markDelivered = async (req, res) => {
     }
 };
 
+// ----------------------------
+// @desc   Volunteer self-accepts an open pickup (before physical pickup)
+// @route  PATCH /api/donations/volunteer-accept
+// @access Private — Volunteer only
+// ----------------------------
+
+const volunteerAcceptDonation = async (req, res) => {
+    const { donationId } = req.body;
+
+    if (!donationId) {
+        return res.status(400).json({ success: false, message: 'Donation ID is required.' });
+    }
+
+    try {
+        const donation = await Donation.findById(donationId);
+
+        if (!donation) {
+            return res.status(404).json({ success: false, message: 'Donation not found.' });
+        }
+
+        // Must be visible to volunteers and not already accepted by another volunteer
+        if (!donation.openToVolunteers && donation.status !== 'accepted') {
+            return res.status(400).json({
+                success: false,
+                message: 'This donation is not yet available for volunteer pickup.',
+            });
+        }
+
+        if (donation.assignedVolunteer) {
+            return res.status(400).json({
+                success: false,
+                message: 'This pickup has already been accepted by another volunteer.',
+            });
+        }
+
+        donation.assignedVolunteer = req.user._id;
+        // Keep status as 'posted' → 'accepted' to mark volunteer assignment
+        if (donation.status === 'posted') {
+            donation.status = 'accepted';
+        }
+        await donation.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Pickup accepted! Head to the donor location.',
+            donation,
+        });
+    } catch (error) {
+        console.error('Volunteer accept error:', error);
+        res.status(500).json({ success: false, message: 'Server error while accepting pickup.' });
+    }
+};
+
 module.exports = {
     createDonation,
     getAllDonations,
     getMyDonations,
     acceptDonation,
+    volunteerAcceptDonation,
     markPickedUp,
     markDelivered,
 };

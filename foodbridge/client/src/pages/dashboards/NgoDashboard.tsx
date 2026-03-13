@@ -8,6 +8,12 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { logout } from '../../store/slices/authSlice';
+import {
+  getAllDonations,
+  acceptDonation as apiAcceptDonation,
+  markDelivered as apiMarkDelivered,
+  addRating as apiAddRating,
+} from '../../services/api';
 import '../../components/common/Dashboard.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
@@ -51,33 +57,42 @@ interface IncomingDelivery {
   quantity: string;
   category: string;
   volunteer: string;
+  volunteerId?: string;
   volunteerPhone: string;
   eta: string;
   pickedUpAt: string;
   status: DeliveryStatus;
 }
 
+/* ─── Map backend donation → Donation / IncomingDelivery ─────── */
+const mapApiDonation = (d: any): Donation => {
+  const statusMap: Record<string, DonationStatus> = {
+    posted: 'available', accepted: 'reserved',
+    picked_up: 'received', delivered: 'distributed', expired: 'distributed',
+  };
+  return {
+    id: d._id,
+    title: d.foodType,
+    donor: d.donorId?.name || 'Donor',
+    quantity: d.quantity || '—',
+    address: d.location,
+    expiryDate: d.expiryTime ? d.expiryTime.slice(0, 10) : '',
+    expiryTimestamp: d.expiryTime ? new Date(d.expiryTime).getTime() : Date.now() + 2 * 3600000,
+    ngoWindowEnd: d.createdAt ? new Date(d.createdAt).getTime() + 2 * 3600000 : Date.now() - 1,
+    category: d.category || 'Other',
+    status: statusMap[d.status] || 'available',
+    reservedBy: d.assignedNGO?.name,
+    assignedVolunteer: d.assignedVolunteer?.name,
+  };
+};
+
 /* ─── Mock data ─────────────────────────────────────────────── */
 const BASE = Date.now();
 const H    = 3600000;
 
-const INIT_DONATIONS: Donation[] = [
-  { id:'1', title:'Cooked Biryani',      donor:'Sunshine Hotel',  quantity:'25 kg',       address:'12 MG Road, Bengaluru',    expiryDate:'2026-03-08', expiryTimestamp: BASE + 2*H,    ngoWindowEnd: BASE + 1.5*H,  category:'Cooked Food', status:'available' },
-  { id:'2', title:'Fresh Bread & Rolls', donor:'City Bakery',     quantity:'10 kg',       address:'5 Park Street, Kolkata',   expiryDate:'2026-03-09', expiryTimestamp: BASE + 5*H,    ngoWindowEnd: BASE - 1*H,    category:'Bakery',      status:'reserved', reservedBy:'Your NGO' },
-  { id:'3', title:'Mixed Vegetables',    donor:'Fresh Mart',      quantity:'15 kg',       address:'88 Church Street, Chennai',expiryDate:'2026-03-10', expiryTimestamp: BASE + 6*H,    ngoWindowEnd: BASE + 0.5*H,  category:'Produce',     status:'available' },
-  { id:'4', title:'Dal & Rice',          donor:'Hotel Grandeur',  quantity:'30 servings', address:'4 Infantry Road, Delhi',   expiryDate:'2026-03-07', expiryTimestamp: BASE + 1*H,    ngoWindowEnd: BASE - 2*H,    category:'Cooked Food', status:'received' },
-  { id:'5', title:'Fruit Platter',       donor:'Grand Catering',  quantity:'8 kg',        address:'22 Bandra West, Mumbai',   expiryDate:'2026-03-09', expiryTimestamp: BASE + 4*H,    ngoWindowEnd: BASE - 0.5*H,  category:'Fruits',      status:'available' },
-  { id:'6', title:'Dairy Products',      donor:'Amul Booth',      quantity:'20 litres',   address:'7 Linking Road, Mumbai',   expiryDate:'2026-03-08', expiryTimestamp: BASE - 1*H,    ngoWindowEnd: BASE - 3*H,    category:'Dairy',       status:'distributed' },
-  { id:'7', title:'Packaged Biscuits',   donor:'Parle Foods',     quantity:'50 boxes',    address:'Andheri West, Mumbai',     expiryDate:'2026-04-01', expiryTimestamp: BASE + 3*H,    ngoWindowEnd: BASE + 2*H,    category:'Packaged',    status:'available' },
-];
+const INIT_DONATIONS: Donation[] = [];
 
-const INIT_DELIVERIES: IncomingDelivery[] = [
-  { id:'d1', item:'Cooked Biryani',     donor:'Sunshine Hotel', quantity:'25 kg',       category:'Cooked Food', volunteer:'Ananya Sharma', volunteerPhone:'+91-9876543210', eta:'~12 mins', pickedUpAt:'10:45 AM', status:'en_route' },
-  { id:'d2', item:'Fresh Bread & Rolls',donor:'City Bakery',    quantity:'10 kg',       category:'Bakery',      volunteer:'Raj Kumar',     volunteerPhone:'+91-9845123456', eta:'Arrived',  pickedUpAt:'11:05 AM', status:'arrived' },
-  { id:'d3', item:'Mixed Vegetables',   donor:'Fresh Mart',     quantity:'15 kg',       category:'Produce',     volunteer:'Arjun Mehta',   volunteerPhone:'+91-9712345678', eta:'~28 mins', pickedUpAt:'11:30 AM', status:'picked_up' },
-  { id:'d4', item:'Fruit Platter',      donor:'Grand Catering', quantity:'8 kg',        category:'Fruits',      volunteer:'Karan Anand',   volunteerPhone:'+91-9823456789', eta:'—',        pickedUpAt:'09:00 AM', status:'confirmed' },
-  { id:'d5', item:'Dal & Rice',         donor:'Hotel Grandeur', quantity:'30 servings', category:'Cooked Food', volunteer:'Priya Singh',   volunteerPhone:'+91-9634567890', eta:'Assigned', pickedUpAt:'—',        status:'assigned' },
-];
+const INIT_DELIVERIES: IncomingDelivery[] = [];
 
 const DISTRIBUTION_LOG = [
   { date:'2026-03-06', item:'Dal & Rice',      quantity:'30 servings', beneficiaries:45, volunteer:'Ananya Sharma' },
@@ -121,9 +136,13 @@ const NgoDashboard: React.FC = () => {
   const [deliveries, setDeliveries]   = useState<IncomingDelivery[]>(INIT_DELIVERIES);
   const [filter, setFilter]           = useState<'all'|DonationStatus>('all');
   const [toastMsg, setToastMsg]       = useState<string | null>(null);
+  const [toastType, setToastType]     = useState<'success' | 'error'>('success');
+  const [loading, setLoading]         = useState(false);
+  const [apiError, setApiError]       = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [now, setNow]                 = useState(Date.now());
   /* ─── Rating modal state ─── */
-  const [ratingModal, setRatingModal] = useState<{ deliveryId: string; volunteer: string; stars: number } | null>(null);
+  const [ratingModal, setRatingModal] = useState<{ deliveryId: string; volunteer: string; volunteerId?: string; stars: number } | null>(null);
   const [submittedRatings, setSubmittedRatings] = useState<Record<string, number>>({});
   /* ─── Assign volunteer modal state ─── */
   const [assignModal, setAssignModal] = useState<string | null>(null); // donationId
@@ -141,42 +160,92 @@ const NgoDashboard: React.FC = () => {
     return () => clearInterval(id);
   }, []);
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); };
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  /* ── Fetch donations from backend ──────────────────────────── */
+  useEffect(() => {
+    const fetchDonations = async () => {
+      setLoading(true);
+      setApiError(null);
+      try {
+        const res = await getAllDonations();
+        setDonations((res.data.donations || []).map(mapApiDonation));
+      } catch (err: any) {
+        setApiError(err.response?.data?.message || 'Failed to load donations.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDonations();
+  }, []);
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg(msg);
+    setToastType(type);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+  const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
   const handleConfirmDelivery = (id: string) => {
     const delivery = deliveries.find(d => d.id === id);
     if (delivery) {
-      // Show rating modal before confirming
-      setRatingModal({ deliveryId: id, volunteer: delivery.volunteer, stars: 5 });
+      setRatingModal({ deliveryId: id, volunteer: delivery.volunteer, volunteerId: delivery.volunteerId, stars: 5 });
     }
   };
 
-  const submitRating = () => {
+  const submitRating = async () => {
     if (!ratingModal) return;
+    // Confirm delivery on backend
+    try {
+      await apiMarkDelivered(ratingModal.deliveryId);
+    } catch {
+      // Delivery might already be confirmed, continue with rating
+    }
+    // Submit rating if we have volunteerId
+    if (ratingModal.volunteerId) {
+      try {
+        await apiAddRating(ratingModal.volunteerId, ratingModal.stars);
+      } catch {
+        // Non-critical — rating failure shouldn't block confirmation
+      }
+    }
     setDeliveries(prev => prev.map(d => d.id === ratingModal.deliveryId ? {...d, status:'confirmed'} : d));
     setSubmittedRatings(prev => ({ ...prev, [ratingModal.deliveryId]: ratingModal.stars }));
     showToast(`⭐ Rated ${ratingModal.volunteer} ${ratingModal.stars}/5 — Thank you!`);
     setRatingModal(null);
   };
 
-  const handleAssignVolunteer = (donationId: string) => {
+  const handleAssignVolunteer = async (donationId: string) => {
     if (!assignVolunteer) return;
-    setDonations(prev => prev.map(d => d.id === donationId
-      ? { ...d, status:'reserved', reservedBy:displayName, assignedVolunteer:assignVolunteer }
-      : d));
-    showToast(`✅ ${assignVolunteer} assigned to pick up this donation.`);
-    setAssignModal(null);
-    setAssignVolunteer('');
+    setActionLoading(prev => ({ ...prev, [donationId]: true }));
+    try {
+      await apiAcceptDonation(donationId);
+      setDonations(prev => prev.map(d => d.id === donationId
+        ? { ...d, status:'reserved', reservedBy:displayName, assignedVolunteer:assignVolunteer }
+        : d));
+      showToast(`✅ ${assignVolunteer} assigned to pick up this donation.`);
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to assign volunteer.', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [donationId]: false }));
+      setAssignModal(null);
+      setAssignVolunteer('');
+    }
   };
 
   const handleDeliveryStep = (id: string, next: DeliveryStatus) => {
     setDeliveries(prev => prev.map(d => d.id===id ? {...d, status:next} : d));
   };
 
-  const handleClaim = (id: string) => {
-    setDonations(prev => prev.map(d => d.id===id ? {...d, status:'reserved', reservedBy:displayName} : d));
-    showToast('Donation claimed! Coordinate with the volunteer for pickup.');
+  const handleClaim = async (id: string) => {
+    setActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      await apiAcceptDonation(id);
+      setDonations(prev => prev.map(d => d.id===id ? {...d, status:'reserved', reservedBy:displayName} : d));
+      showToast('Donation claimed! Coordinate with the volunteer for pickup.');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to claim donation.', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [id]: false }));
+    }
   };
 
   const handleReceive = (id: string) => {
@@ -325,6 +394,23 @@ const NgoDashboard: React.FC = () => {
         </div>
 
         <div className="db-content">
+
+          {/* Loading / error banner */}
+          {loading && (
+            <div style={{ textAlign:'center', padding:'40px 0', color:'var(--c-muted)' }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize:'2rem', marginBottom:12, display:'block' }}></i>
+              Loading dashboard data…
+            </div>
+          )}
+          {apiError && !loading && (
+            <div style={{ background:'#FEE2E2', border:'1px solid #FCA5A5', borderRadius:'var(--r-md)', padding:'14px 20px', marginBottom:20, color:'#991B1B', display:'flex', alignItems:'center', gap:10 }}>
+              <i className="fas fa-circle-exclamation"></i>
+              <span>{apiError}</span>
+              <button className="db-btn db-btn-ghost db-btn-sm" style={{ marginLeft:'auto' }} onClick={() => setApiError(null)}>
+                <i className="fas fa-xmark"></i>
+              </button>
+            </div>
+          )}
 
           {/* ════ OVERVIEW ════ */}
           {tab==='overview' && (
@@ -603,8 +689,8 @@ const NgoDashboard: React.FC = () => {
                           <div className="pickup-card-actions">
                             {d.status === 'available' && (
                               <>
-                                <button className="db-btn db-btn-primary" style={{ flex:1 }} onClick={() => handleClaim(d.id)}>
-                                  <i className="fas fa-hand-holding"></i> Claim Donation
+                                <button className="db-btn db-btn-primary" style={{ flex:1 }} onClick={() => handleClaim(d.id)} disabled={!!actionLoading[d.id]}>
+                                  {actionLoading[d.id] ? <><i className="fas fa-spinner fa-spin"></i> Claiming…</> : <><i className="fas fa-hand-holding"></i> Claim Donation</>}
                                 </button>
                                 {ngoWindow && (
                                   <button className="db-btn db-btn-secondary" onClick={() => { setAssignModal(d.id); setAssignVolunteer(''); }}>
@@ -787,7 +873,7 @@ const NgoDashboard: React.FC = () => {
         </div>
       </main>
 
-      {toastMsg && <div className="db-toast"><i className="fas fa-circle-check"></i> {toastMsg}</div>}
+      {toastMsg && <div className={`db-toast${toastType === 'error' ? ' db-toast-error' : ''}`}><i className={`fas ${toastType === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i> {toastMsg}</div>}
 
       {/* ════ RATING MODAL ════ */}
       {ratingModal && (
@@ -864,9 +950,9 @@ const NgoDashboard: React.FC = () => {
             </div>
             <div style={{ display:'flex', gap:10 }}>
               <button className="db-btn db-btn-ghost" style={{ flex:1 }} onClick={() => { setAssignModal(null); setAssignVolunteer(''); }}>Cancel</button>
-              <button className="db-btn db-btn-primary" style={{ flex:2 }} disabled={!assignVolunteer}
+              <button className="db-btn db-btn-primary" style={{ flex:2 }} disabled={!assignVolunteer || !!actionLoading[assignModal||'']}
                 onClick={() => handleAssignVolunteer(assignModal)}>
-                <i className="fas fa-check"></i> Assign & Reserve
+                {actionLoading[assignModal||''] ? <><i className="fas fa-spinner fa-spin"></i> Assigning…</> : <><i className="fas fa-check"></i> Assign & Reserve</>}
               </button>
             </div>
           </div>
@@ -877,3 +963,6 @@ const NgoDashboard: React.FC = () => {
 };
 
 export default NgoDashboard;
+
+
+

@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { logout } from '../../store/slices/authSlice';
+import { getAllDonations, volunteerAcceptPickup, markPickedUp as apiMarkPickedUp } from '../../services/api';
 import '../../components/common/Dashboard.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
@@ -44,18 +45,34 @@ const calcExpiry = (ts: number, now: number) => {
   return { label, color: '#DC2626', bg: '#FEE2E2', urgency: 'red' as const };
 };
 
-/* ─── Mock data ─────────────────────────────────────────────── */
+/* ─── Map backend donation → PickupRequest ──────────────────── */
+const mapApiDonationToPickup = (d: any): PickupRequest => {
+  const statusMap: Record<string, PickupStatus> = {
+    posted: 'available', accepted: 'accepted',
+    picked_up: 'in-transit', delivered: 'completed', expired: 'completed',
+  };
+  return {
+    id: d._id,
+    foodTitle: d.foodType + (d.quantity ? ` (${d.quantity})` : ''),
+    donor: d.donorId?.name || 'Donor',
+    address: d.location,
+    distance: '—',
+    weight: d.quantity || '—',
+    expiryIn: '',
+    expiryTimestamp: d.expiryTime ? new Date(d.expiryTime).getTime() : Date.now() + 4 * 3600000,
+    ngoWindowEnd: d.createdAt ? new Date(d.createdAt).getTime() + 2 * 3600000 : Date.now() - 1,
+    ngo: d.assignedNGO?.name || '—',
+    ngoAddress: '—',
+    status: statusMap[d.status] || 'available',
+    category: d.category || 'Other',
+  };
+};
+
+/* ─── Mock data (used only in demo mode without token) ──────── */
 const BASE = Date.now();
 const H    = 3600000;
 
-const INIT_PICKUPS: PickupRequest[] = [
-  { id:'1', foodTitle:'Cooked Biryani (25 kg)',   donor:'Sunshine Hotel',  address:'12 MG Road, Bengaluru',     distance:'0.8 km', weight:'25 kg',  expiryIn:'2 hrs', expiryTimestamp: BASE + 2*H,    ngoWindowEnd: BASE - 1*H,    ngo:'Helping Hands NGO',    ngoAddress:'44 Residency Rd',    status:'available',  category:'Cooked Food' },
-  { id:'2', foodTitle:'Fresh Bread (10 kg)',       donor:'City Bakery',     address:'5 Park St, Bengaluru',      distance:'1.4 km', weight:'10 kg',  expiryIn:'4 hrs', expiryTimestamp: BASE + 4*H,    ngoWindowEnd: BASE - 0.5*H,  ngo:'City Care Foundation', ngoAddress:'8 Brigade Rd',       status:'available',  category:'Bakery' },
-  { id:'3', foodTitle:'Mixed Vegetables (15 kg)',  donor:'Fresh Mart',      address:'88 Church St, Bengaluru',   distance:'2.1 km', weight:'15 kg',  expiryIn:'6 hrs', expiryTimestamp: BASE + 6*H,    ngoWindowEnd: BASE + 1.5*H,  ngo:'Green Hope Trust',     ngoAddress:'16 Commercial St',   status:'accepted',   category:'Produce' },
-  { id:'4', foodTitle:'Dal & Rice (30 servings)',  donor:'Hotel Grandeur',  address:'4 Infantry Rd, Bengaluru',  distance:'3.5 km', weight:'30 srv', expiryIn:'1 hr',  expiryTimestamp: BASE + 1*H,    ngoWindowEnd: BASE - 2*H,    ngo:'Annadanam Trust',      ngoAddress:'Majestic Bus Stand', status:'available',  category:'Cooked Food' },
-  { id:'5', foodTitle:'Fruit Platter (8 kg)',      donor:'Grand Catering',  address:'22 Lavelle Rd, Bengaluru',  distance:'2.8 km', weight:'8 kg',   expiryIn:'5 hrs', expiryTimestamp: BASE + 5*H,    ngoWindowEnd: BASE - 1*H,    ngo:'Hope Foundation',      ngoAddress:'Freedom Park',       status:'in-transit', category:'Fruits' },
-  { id:'6', foodTitle:'Dairy Products (20 L)',     donor:'Amul Booth',      address:'7 Linking Rd, Bengaluru',   distance:'1.1 km', weight:'20 L',   expiryIn:'3 hrs', expiryTimestamp: BASE + 3*H,    ngoWindowEnd: BASE - 3*H,    ngo:'Smile Foundation',     ngoAddress:'Cubbon Park Gate',   status:'completed',  category:'Dairy' },
-];
+const INIT_PICKUPS: PickupRequest[] = [];
 
 const EMOJI_MAP: Record<string, string> = {
   'Cooked Food':'🍛','Bakery':'🍞','Produce':'🥦','Fruits':'🍎','Dairy':'🥛','Other':'🍽️',
@@ -83,7 +100,11 @@ const VolunteerDashboard: React.FC = () => {
   const [tab, setTab]           = useState<Tab>('pickups');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pickups, setPickups]   = useState<PickupRequest[]>(INIT_PICKUPS);
+  const [loading, setLoading]   = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [now, setNow]           = useState(Date.now());
 
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'VL';
@@ -95,36 +116,75 @@ const VolunteerDashboard: React.FC = () => {
     return () => clearInterval(id);
   }, []);
 
+  /* ── Fetch available donations from backend ──────────────── */
+  useEffect(() => {
+    const fetchPickups = async () => {
+      setLoading(true);
+      setApiError(null);
+      try {
+        const res = await getAllDonations();
+        setPickups((res.data.donations || []).map(mapApiDonationToPickup));
+      } catch (err: any) {
+        setApiError(err.response?.data?.message || 'Failed to load pickup requests.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPickups();
+  }, []);
+
   const verificationStatus = user?.verificationStatus ?? 'pending'; // default pending for demo
   const isVerified         = verificationStatus === 'verified';
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); };
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg(msg);
+    setToastType(type);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
-  const handleAccept = (id: string) => {
+  const handleAccept = async (id: string) => {
     if (!isVerified) {
       const activeCount = pickups.filter(p => p.status === 'accepted' || p.status === 'in-transit').length;
       if (activeCount >= 3) {
-        showToast('⚠️ Unverified volunteers can accept up to 3 pickups. Verification is pending admin review.');
+        showToast('⚠️ Unverified volunteers can accept up to 3 pickups. Verification is pending admin review.', 'error');
         return;
       }
     }
-    setPickups(prev => prev.map(p => p.id===id ? {...p, status:'accepted'} : p));
-    showToast('Pickup accepted! Head to the donor location.');
-    setTab('active');
+    setActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      await volunteerAcceptPickup(id);
+      setPickups(prev => prev.map(p => p.id === id ? {...p, status:'accepted'} : p));
+      showToast('Pickup accepted! Head to the donor location.');
+      setTab('active');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to accept pickup.', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [id]: false }));
+    }
   };
 
-  const handleStartTransit = (id: string) => {
-    setPickups(prev => prev.map(p => p.id===id ? {...p, status:'in-transit'} : p));
-    showToast('En route to NGO!');
+  const handleStartTransit = async (id: string) => {
+    setActionLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      await apiMarkPickedUp(id);
+      setPickups(prev => prev.map(p => p.id === id ? {...p, status:'in-transit'} : p));
+      showToast('En route to NGO! Food has been picked up.');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to mark as picked up.', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [id]: false }));
+    }
   };
 
   const handleComplete = (id: string) => {
-    setPickups(prev => prev.map(p => p.id===id ? {...p, status:'completed'} : p));
-    showToast('Delivery completed! Great work 🎉');
+    // Delivery confirmation is done by the NGO on their dashboard.
+    // Volunteer marks it locally and NGO confirms via /api/donations/delivered.
+    setPickups(prev => prev.map(p => p.id === id ? {...p, status:'completed'} : p));
+    showToast('Delivery marked! The NGO will confirm receipt. Great work 🎉');
     setTab('history');
   };
 
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
   /* Stats */
   const stats = {
@@ -140,7 +200,7 @@ const VolunteerDashboard: React.FC = () => {
   const completedPickups = pickups.filter(p => p.status==='completed');
 
   /* Mock rating data (would come from backend in production) */
-  const myRating = { average: 4.8, count: completedPickups.length + 3, totalKg: 127 };
+  const myRating = { average: user?.rating || 0, count: user?.deliveriesCompleted || 0, totalKg: 127 };
 
   /* Charts */
   const barData = {
@@ -259,6 +319,23 @@ const VolunteerDashboard: React.FC = () => {
         </div>
 
         <div className="db-content">
+
+          {/* Loading / error banner */}
+          {loading && (
+            <div style={{ textAlign:'center', padding:'40px 0', color:'var(--c-muted)' }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize:'2rem', marginBottom:12, display:'block' }}></i>
+              Loading pickup requests…
+            </div>
+          )}
+          {apiError && !loading && (
+            <div style={{ background:'#FEE2E2', border:'1px solid #FCA5A5', borderRadius:'var(--r-md)', padding:'14px 20px', marginBottom:20, color:'#991B1B', display:'flex', alignItems:'center', gap:10 }}>
+              <i className="fas fa-circle-exclamation"></i>
+              <span>{apiError}</span>
+              <button className="db-btn db-btn-ghost db-btn-sm" style={{ marginLeft:'auto' }} onClick={() => setApiError(null)}>
+                <i className="fas fa-xmark"></i>
+              </button>
+            </div>
+          )}
 
           {/* ════ VERIFICATION BANNER ════ */}
           {verificationStatus !== 'verified' && (
@@ -439,9 +516,12 @@ const VolunteerDashboard: React.FC = () => {
                                   className="db-btn db-btn-primary"
                                   style={{ flex:1, opacity: limitReached ? 0.5 : 1 }}
                                   onClick={() => handleAccept(p.id)}
-                                  disabled={limitReached}
+                                  disabled={limitReached || !!actionLoading[p.id]}
                                 >
-                                  <i className="fas fa-hand-point-up"></i> Accept Pickup
+                                  {actionLoading[p.id]
+                                    ? <><i className="fas fa-spinner fa-spin"></i> Accepting…</>
+                                    : <><i className="fas fa-hand-point-up"></i> Accept Pickup</>
+                                  }
                                 </button>
                                 <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-map"></i></button>
                               </div>
@@ -518,8 +598,8 @@ const VolunteerDashboard: React.FC = () => {
 
                       <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
                         {p.status==='accepted' && (
-                          <button className="db-btn db-btn-secondary" onClick={() => handleStartTransit(p.id)}>
-                            <i className="fas fa-motorcycle"></i> Start Delivery
+                          <button className="db-btn db-btn-secondary" onClick={() => handleStartTransit(p.id)} disabled={!!actionLoading[p.id]}>
+                            {actionLoading[p.id] ? <><i className="fas fa-spinner fa-spin"></i> Updating…</> : <><i className="fas fa-motorcycle"></i> Start Delivery</>}
                           </button>
                         )}
                         {p.status==='in-transit' && (
@@ -673,9 +753,16 @@ const VolunteerDashboard: React.FC = () => {
         </div>
       </main>
 
-      {toastMsg && <div className="db-toast"><i className="fas fa-circle-check"></i> {toastMsg}</div>}
+      {toastMsg && (
+        <div className={`db-toast${toastType === 'error' ? ' db-toast-error' : ''}`}>
+          <i className={`fas ${toastType === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i> {toastMsg}
+        </div>
+      )}
     </div>
   );
 };
 
 export default VolunteerDashboard;
+
+
+

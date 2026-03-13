@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { logout } from '../../store/slices/authSlice';
+import { getMyDonations, createDonation as apiCreateDonation } from '../../services/api';
 import '../../components/common/Dashboard.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
@@ -27,15 +28,26 @@ interface Donation {
   createdAt: string;
 }
 
-/* ─── Mock data ─────────────────────────────────────────────── */
-const INIT_DONATIONS: Donation[] = [
-  { id:'1', title:'Cooked Biryani',       description:'Large batch leftover from event.',        quantity:'25', unit:'kg',       category:'Cooked Food', expiryDate:'2026-03-08', pickupLocation:'12 MG Road, Bengaluru',    status:'claimed',  imageURL:null, createdAt:'2026-03-06' },
-  { id:'2', title:'Fresh Bread & Rolls',  description:'End-of-day bakery surplus.',              quantity:'10', unit:'kg',       category:'Bakery',      expiryDate:'2026-03-07', pickupLocation:'5 Park Street, Kolkata',   status:'claimed',  imageURL:null, createdAt:'2026-03-05' },
-  { id:'3', title:'Mixed Vegetables',     description:'Fresh produce, no pesticides used.',      quantity:'15', unit:'kg',       category:'Produce',     expiryDate:'2026-03-09', pickupLocation:'88 Anna Salai, Chennai',   status:'active',   imageURL:null, createdAt:'2026-03-07' },
-  { id:'4', title:'Dal & Rice',           description:'Cafeteria lunch surplus.',                quantity:'30', unit:'servings', category:'Cooked Food', expiryDate:'2026-03-06', pickupLocation:'4 Connaught Place, Delhi', status:'expired',  imageURL:null, createdAt:'2026-03-04' },
-  { id:'5', title:'Fruit Platter',        description:'Event decoration fruits, fully edible.', quantity:'8',  unit:'kg',       category:'Fruits',      expiryDate:'2026-03-08', pickupLocation:'22 Bandra West, Mumbai',   status:'active',   imageURL:null, createdAt:'2026-03-07' },
-  { id:'6', title:'Dairy Products',       description:'Excess from catering event.',             quantity:'12', unit:'litres',   category:'Dairy',       expiryDate:'2026-03-08', pickupLocation:'7 Linking Road, Mumbai',   status:'claimed',  imageURL:null, createdAt:'2026-03-06' },
-];
+/* ─── Map backend donation → frontend Donation ────────────── */
+const mapApiStatus = (s: string): Donation['status'] => {
+  if (s === 'posted') return 'active';
+  if (s === 'accepted' || s === 'picked_up' || s === 'delivered') return 'claimed';
+  return 'expired';
+};
+
+const mapApiDonation = (d: any): Donation => ({
+  id: d._id,
+  title: d.foodType,
+  description: d.description || '',
+  quantity: d.quantity,
+  unit: '',
+  category: d.category || 'Other',
+  expiryDate: d.expiryTime ? d.expiryTime.slice(0, 10) : (d.createdAt?.slice(0, 10) || ''),
+  pickupLocation: d.location,
+  status: mapApiStatus(d.status),
+  imageURL: null,
+  createdAt: d.createdAt?.slice(0, 10) || '',
+});
 
 const MONTHS = ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 const DONATIONS_OVER_TIME = [3, 5, 4, 7, 6, 8, 9];
@@ -57,7 +69,7 @@ const statusBadge = (s: Donation['status']) =>
   s === 'active' ? 'badge-orange' : s === 'claimed' ? 'badge-green' : 'badge-gray';
 
 /* ─── Sidebar nav items ──────────────────────────────────────── */
-type Tab = 'overview' | 'donate' | 'history';
+type Tab = 'overview' | 'donate' | 'history' | 'profile' | 'settings';
 
 /* ═══════════════════════════════════════════════════════════════
    DONOR DASHBOARD PAGE
@@ -69,12 +81,15 @@ const DonorDashboard: React.FC = () => {
 
   const [tab, setTab]       = useState<Tab>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [donations, setDonations]     = useState<Donation[]>(INIT_DONATIONS);
+  const [donations, setDonations]     = useState<Donation[]>([]);
+  const [loading, setLoading]         = useState(false);
+  const [apiError, setApiError]       = useState<string | null>(null);
   const [editId, setEditId]           = useState<string | null>(null);
   const [previewURL, setPreviewURL]   = useState<string | null>(null);
   const [dragOver, setDragOver]       = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [toastMsg, setToastMsg]       = useState<string | null>(null);
+  const [toastType, setToastType]     = useState<'success' | 'error'>('success');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const blank = { title:'', description:'', quantity:'', unit:'kg', category:'Cooked Food', expiryDate:'', pickupLocation:'' };
@@ -82,11 +97,31 @@ const DonorDashboard: React.FC = () => {
 
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'DN';
   const displayName = user?.name || 'Donor';
+  const userEmail   = user?.email || 'Not provided';
+  const userPhone   = user?.phone || 'Not provided';
+
+  /* ── Fetch donations from backend ─────────────────────────── */
+  useEffect(() => {
+    const fetchDonations = async () => {
+      setLoading(true);
+      setApiError(null);
+      try {
+        const res = await getMyDonations();
+        setDonations((res.data.donations || []).map(mapApiDonation));
+      } catch (err: any) {
+        setApiError(err.response?.data?.message || 'Failed to load donations.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDonations();
+  }, []);
 
   /* toast helper */
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    setToastType(type);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   /* handle form field changes */
@@ -105,15 +140,38 @@ const DonorDashboard: React.FC = () => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 700));
+
     if (editId) {
+      // Local edit (no backend edit endpoint)
       setDonations(prev => prev.map(d => d.id === editId ? { ...d, ...form, imageURL: previewURL } : d));
-      showToast('Donation updated successfully!');
+      showToast('Donation updated locally.');
       setEditId(null);
-    } else {
-      setDonations(prev => [{ id: Date.now().toString(), ...form, status:'active', imageURL: previewURL, createdAt: new Date().toISOString().slice(0,10) }, ...prev]);
-      showToast('Donation logged successfully!');
+      setForm(blank);
+      setPreviewURL(null);
+      setSubmitting(false);
+      setTab('history');
+      return;
     }
+
+    try {
+      const payload = {
+        foodType: form.title,
+        quantity: `${form.quantity} ${form.unit}`,
+        location: form.pickupLocation,
+        preparedTime: new Date().toISOString(),
+        description: form.description,
+        category: form.category,
+      };
+
+      const res = await apiCreateDonation(payload);
+      setDonations(prev => [mapApiDonation(res.data.donation), ...prev]);
+      showToast('Donation submitted successfully!');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to submit donation.', 'error');
+      setSubmitting(false);
+      return;
+    }
+
     setForm(blank);
     setPreviewURL(null);
     setSubmitting(false);
@@ -128,10 +186,10 @@ const DonorDashboard: React.FC = () => {
     setTab('donate');
   };
 
-  /* delete */
+  /* delete — local only */
   const deleteDonation = (id: string) => {
     setDonations(prev => prev.filter(d => d.id !== id));
-    showToast('Donation deleted.');
+    showToast('Donation removed from view.');
   };
 
   /* stats */
@@ -181,7 +239,7 @@ const DonorDashboard: React.FC = () => {
   };
 
   /* handle logout */
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
   return (
     <div className="db-layout">
@@ -210,8 +268,14 @@ const DonorDashboard: React.FC = () => {
 
           <div className="db-nav-section">
             <div className="db-nav-label">Account</div>
-            <Link to="/profile"  className="db-nav-item"><i className="fas fa-user"></i> Profile</Link>
-            <Link to="/settings" className="db-nav-item"><i className="fas fa-gear"></i> Settings</Link>
+            <button className={`db-nav-item${tab==='profile'?' active':''}`}
+              onClick={() => { setTab('profile'); setSidebarOpen(false); }}>
+              <i className="fas fa-user"></i> Profile
+            </button>
+            <button className={`db-nav-item${tab==='settings'?' active':''}`}
+              onClick={() => { setTab('settings'); setSidebarOpen(false); }}>
+              <i className="fas fa-gear"></i> Settings
+            </button>
             <button className="db-nav-item" style={{color:'#EF4444'}} onClick={handleLogout}>
               <i className="fas fa-right-from-bracket"></i> Logout
             </button>
@@ -239,19 +303,42 @@ const DonorDashboard: React.FC = () => {
               {tab === 'overview' && '📊 Donor Overview'}
               {tab === 'donate'   && (editId ? '✏️ Edit Donation' : '➕ Log Surplus Food')}
               {tab === 'history'  && '📋 Donation History'}
+              {tab === 'profile'  && '👤 Profile'}
+              {tab === 'settings' && '⚙️ Settings'}
             </div>
           </div>
           <div className="db-topbar-right">
             <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
-            <button className="db-btn db-btn-primary db-btn-sm" onClick={() => { setEditId(null); setForm(blank); setPreviewURL(null); setTab('donate'); }}>
-              <i className="fas fa-plus"></i> Quick Donate
-            </button>
+            {tab !== 'settings' && tab !== 'profile' && (
+              <button className="db-btn db-btn-primary db-btn-sm" onClick={() => { setEditId(null); setForm(blank); setPreviewURL(null); setTab('donate'); }}>
+                <i className="fas fa-plus"></i> Quick Donate
+              </button>
+            )}
           </div>
         </div>
 
         {/* ── Content ── */}
         <div className="db-content">
 
+          {/* Loading / error banner */}
+          {loading && (
+            <div style={{ textAlign:'center', padding:'40px 0', color:'var(--c-muted)' }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize:'2rem', marginBottom:12, display:'block' }}></i>
+              Loading your donations…
+            </div>
+          )}
+          {apiError && !loading && (
+            <div style={{ background:'#FEE2E2', border:'1px solid #FCA5A5', borderRadius:'var(--r-md)', padding:'14px 20px', marginBottom:20, color:'#991B1B', display:'flex', alignItems:'center', gap:10 }}>
+              <i className="fas fa-circle-exclamation"></i>
+              <span>{apiError}</span>
+              <button className="db-btn db-btn-ghost db-btn-sm" style={{ marginLeft:'auto' }} onClick={() => setApiError(null)}>
+                <i className="fas fa-xmark"></i>
+              </button>
+            </div>
+          )}
+
+          {!loading && (
+            <>
           {/* ════ OVERVIEW ════ */}
           {tab === 'overview' && (
             <>
@@ -297,7 +384,7 @@ const DonorDashboard: React.FC = () => {
                     <div className="db-card-title"><i className="fas fa-chart-pie"></i> Food Categories</div>
                   </div>
                   <div className="db-card-body">
-                    <div style={{ height:220 }}><Doughnut data={doughnutData} options={doughnutOpts} /></div>
+                    <div style={{ height:220 }}>{Object.keys(catCounts).length > 0 ? <Doughnut data={doughnutData} options={doughnutOpts} /> : <p style={{ textAlign:'center', color:'var(--c-muted)', paddingTop:80 }}>No data yet</p>}</div>
                   </div>
                 </div>
               </div>
@@ -321,26 +408,31 @@ const DonorDashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="db-card-body" style={{ paddingTop:0 }}>
-                  <table className="db-table">
-                    <thead><tr><th>Food Item</th><th>Qty</th><th>Category</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {donations.slice(0,4).map(d => (
-                        <tr key={d.id}>
-                          <td><span style={{ marginRight:8 }}>{getEmoji(d.title)}</span>{d.title}</td>
-                          <td>{d.quantity} {d.unit}</td>
-                          <td><span className="db-badge badge-blue">{d.category}</span></td>
-                          <td style={{ fontSize:'0.82rem' }}>{d.expiryDate}</td>
-                          <td><span className={`db-badge ${statusBadge(d.status)}`}>{d.status}</span></td>
-                          <td>
-                            <div style={{ display:'flex', gap:6 }}>
-                              <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => startEdit(d)}><i className="fas fa-pen"></i></button>
-                              <button className="db-btn db-btn-danger db-btn-sm" onClick={() => deleteDonation(d.id)}><i className="fas fa-trash"></i></button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {donations.length === 0
+                    ? <div className="db-empty-state"><i className="fas fa-box-open"></i><p>No donations yet. <button className="db-btn db-btn-primary db-btn-sm" onClick={() => setTab('donate')}>Log your first donation</button></p></div>
+                    : (
+                      <table className="db-table">
+                        <thead><tr><th>Food Item</th><th>Qty</th><th>Category</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                          {donations.slice(0,4).map(d => (
+                            <tr key={d.id}>
+                              <td><span style={{ marginRight:8 }}>{getEmoji(d.title)}</span>{d.title}</td>
+                              <td>{d.quantity}</td>
+                              <td><span className="db-badge badge-blue">{d.category}</span></td>
+                              <td style={{ fontSize:'0.82rem' }}>{d.expiryDate}</td>
+                              <td><span className={`db-badge ${statusBadge(d.status)}`}>{d.status}</span></td>
+                              <td>
+                                <div style={{ display:'flex', gap:6 }}>
+                                  <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => startEdit(d)}><i className="fas fa-pen"></i></button>
+                                  <button className="db-btn db-btn-danger db-btn-sm" onClick={() => deleteDonation(d.id)}><i className="fas fa-trash"></i></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  }
                 </div>
               </div>
             </>
@@ -444,44 +536,126 @@ const DonorDashboard: React.FC = () => {
                 </button>
               </div>
 
-              <div className="donation-cards-grid">
-                {donations.map(d => (
-                  <div className="donation-card" key={d.id}>
-                    <div className="donation-card-img">
-                      {d.imageURL
-                        ? <img src={d.imageURL} alt={d.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        : <span style={{ fontSize:'3.5rem' }}>{getEmoji(d.title)}</span>
-                      }
-                    </div>
-                    <div className="donation-card-body">
-                      <div className="donation-card-title">{d.title}</div>
-                      <div className="donation-card-meta">
-                        <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{d.quantity} {d.unit}</span>
-                        <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{d.pickupLocation.split(',')[0]}</span>
-                        <span className="donation-meta-item"><i className="fas fa-tag"></i>{d.category}</span>
-                        <span className="donation-meta-item"><i className="fas fa-calendar"></i>{d.expiryDate}</span>
+              {donations.length === 0
+                ? <div className="db-empty-state"><i className="fas fa-box-open"></i><p>No donations yet.</p></div>
+                : (
+                  <div className="donation-cards-grid">
+                    {donations.map(d => (
+                      <div className="donation-card" key={d.id}>
+                        <div className="donation-card-img">
+                          {d.imageURL
+                            ? <img src={d.imageURL} alt={d.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                            : <span style={{ fontSize:'3.5rem' }}>{getEmoji(d.title)}</span>
+                          }
+                        </div>
+                        <div className="donation-card-body">
+                          <div className="donation-card-title">{d.title}</div>
+                          <div className="donation-card-meta">
+                            <span className="donation-meta-item"><i className="fas fa-weight-hanging"></i>{d.quantity}</span>
+                            <span className="donation-meta-item"><i className="fas fa-location-dot"></i>{d.pickupLocation.split(',')[0]}</span>
+                            <span className="donation-meta-item"><i className="fas fa-tag"></i>{d.category}</span>
+                            {d.expiryDate && <span className="donation-meta-item"><i className="fas fa-calendar"></i>{d.expiryDate}</span>}
+                          </div>
+                          {d.description && <p style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginBottom:10 }}>{d.description}</p>}
+                        </div>
+                        <div className="donation-card-footer">
+                          <span className={`db-badge ${statusBadge(d.status)}`}>{d.status}</span>
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => startEdit(d)} disabled={d.status !== 'active'}><i className="fas fa-pen"></i> Edit</button>
+                            <button className="db-btn db-btn-danger db-btn-sm" onClick={() => deleteDonation(d.id)}><i className="fas fa-trash"></i></button>
+                          </div>
+                        </div>
                       </div>
-                      {d.description && <p style={{ fontSize:'0.8rem', color:'var(--c-muted)', marginBottom:10 }}>{d.description}</p>}
+                    ))}
+                  </div>
+                )
+              }
+            </>
+          )}
+
+          {/* ════ PROFILE ════ */}
+          {tab === 'profile' && (
+            <>
+              <div className="db-page-header">
+                <h2>Your Profile</h2>
+                <p>Review your donor account details.</p>
+              </div>
+
+              <div className="db-card" style={{ marginBottom: 20 }}>
+                <div className="db-card-body" style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:20, alignItems:'center' }}>
+                  <div className="db-avatar" style={{ width:84, height:84, fontSize:'1.35rem' }}>{initials}</div>
+                  <div>
+                    <h3 style={{ margin:'0 0 8px 0' }}>{displayName}</h3>
+                    <p style={{ margin:'0 0 4px 0', color:'var(--c-muted)' }}><i className="fas fa-envelope" style={{ marginRight:8 }}></i>{userEmail}</p>
+                    <p style={{ margin:0, color:'var(--c-muted)' }}><i className="fas fa-phone" style={{ marginRight:8 }}></i>{userPhone}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="db-card">
+                <div className="db-card-header">
+                  <div className="db-card-title"><i className="fas fa-chart-simple"></i> Contribution Snapshot</div>
+                </div>
+                <div className="db-card-body">
+                  <div className="db-stats-row">
+                    <div className="db-stat-chip">
+                      <div className="db-stat-ico" style={{ background:'rgba(16,185,129,0.1)' }}><i className="fas fa-box-open" style={{ color:'var(--c-primary)' }}></i></div>
+                      <div><div className="db-stat-num">{stats.total}</div><div className="db-stat-lbl">Total Donations</div></div>
                     </div>
-                    <div className="donation-card-footer">
-                      <span className={`db-badge ${statusBadge(d.status)}`}>{d.status}</span>
-                      <div style={{ display:'flex', gap:8 }}>
-                        <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => startEdit(d)}><i className="fas fa-pen"></i> Edit</button>
-                        <button className="db-btn db-btn-danger db-btn-sm" onClick={() => deleteDonation(d.id)}><i className="fas fa-trash"></i></button>
-                      </div>
+                    <div className="db-stat-chip">
+                      <div className="db-stat-ico" style={{ background:'rgba(37,99,235,0.1)' }}><i className="fas fa-circle-check" style={{ color:'var(--c-secondary)' }}></i></div>
+                      <div><div className="db-stat-num">{stats.claimed}</div><div className="db-stat-lbl">Claimed Donations</div></div>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
             </>
+          )}
+
+          {/* ════ SETTINGS ════ */}
+          {tab === 'settings' && (
+            <>
+              <div className="db-page-header">
+                <h2>Settings</h2>
+                <p>Manage your donor dashboard preferences.</p>
+              </div>
+
+              <div className="db-card" style={{ marginBottom: 20 }}>
+                <div className="db-card-header">
+                  <div className="db-card-title"><i className="fas fa-bell"></i> Notification Preferences</div>
+                </div>
+                <div className="db-card-body" style={{ display:'grid', gap:14 }}>
+                  <label style={{ display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid var(--c-border)', borderRadius:'var(--r-md)', padding:'10px 14px' }}>
+                    <span>Email updates for claimed donations</span>
+                    <input type="checkbox" defaultChecked />
+                  </label>
+                  <label style={{ display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid var(--c-border)', borderRadius:'var(--r-md)', padding:'10px 14px' }}>
+                    <span>Reminders for expiring listings</span>
+                    <input type="checkbox" defaultChecked />
+                  </label>
+                </div>
+              </div>
+
+              <div className="db-card">
+                <div className="db-card-header">
+                  <div className="db-card-title"><i className="fas fa-shield"></i> Account</div>
+                </div>
+                <div className="db-card-body" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
+                  <p style={{ margin:0, color:'var(--c-muted)' }}>You can sign out safely from this device.</p>
+                  <button className="db-btn db-btn-danger" onClick={handleLogout}><i className="fas fa-right-from-bracket"></i> Logout</button>
+                </div>
+              </div>
+            </>
+          )}
+          </>
           )}
         </div>
       </main>
 
       {/* ── Toast ── */}
       {toastMsg && (
-        <div className="db-toast">
-          <i className="fas fa-circle-check"></i> {toastMsg}
+        <div className={`db-toast${toastType === 'error' ? ' db-toast-error' : ''}`}>
+          <i className={`fas ${toastType === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i> {toastMsg}
         </div>
       )}
     </div>

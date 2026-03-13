@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getAllUsers, getAllDonations, getStats } = require('../controllers/adminController');
+const {
+    getAllUsers,
+    getAllDonations,
+    getStats,
+    updateUserStatus,
+    updateUserVerification,
+} = require('../controllers/adminController');
 const { getAllVerifications, reviewVerification } = require('../controllers/verificationController');
 const { protect } = require('../middleware/authMiddleware');
 const { restrictTo } = require('../middleware/roleMiddleware');
@@ -24,5 +30,13 @@ router.get('/verifications', getAllVerifications);
 // PATCH /api/admin/verifications/:id — Approve or reject a verification
 // Body: { status: "approved" | "rejected" }
 router.patch('/verifications/:id', reviewVerification);
+
+// PATCH /api/admin/users/:id/status — Activate or suspend a user account
+// Body: { status: "active" | "inactive" | "suspended" }
+router.patch('/users/:id/status', updateUserStatus);
+
+// PATCH /api/admin/users/:id/verify — Update a user's verificationStatus
+// Body: { verificationStatus: "approved" | "rejected" | "pending" }
+router.patch('/users/:id/verify', updateUserVerification);
 
 module.exports = router;

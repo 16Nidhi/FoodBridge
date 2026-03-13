@@ -5,6 +5,7 @@ const {
     getAllDonations,
     getMyDonations,
     acceptDonation,
+    volunteerAcceptDonation,
     markPickedUp,
     markDelivered,
 } = require('../controllers/donationController');
@@ -26,6 +27,9 @@ router.get('/my-donations', restrictTo('donor'), getMyDonations);
 
 // PATCH /api/donations/accept — NGO accepts a donation (body: { donationId, volunteerId? })
 router.patch('/accept', restrictTo('ngo'), acceptDonation);
+
+// PATCH /api/donations/volunteer-accept — Volunteer self-accepts an open pickup
+router.patch('/volunteer-accept', restrictTo('volunteer'), volunteerAcceptDonation);
 
 // PATCH /api/donations/picked-up — Volunteer marks food as collected (body: { donationId })
 router.patch('/picked-up', restrictTo('volunteer'), markPickedUp);
