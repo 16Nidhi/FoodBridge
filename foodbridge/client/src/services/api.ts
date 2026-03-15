@@ -2,6 +2,10 @@ import axios from 'axios';
 import type { FoodListing } from '../types';
 
 const api = axios.create({
+  // Prefer environment variable `VITE_API_URL` (example: http://localhost:5001)
+  // Default to backend on port 5001 as required by the project setup.
+  // If your backend runs on a different port set VITE_API_URL in .env
+  // Default to port 5000 where the backend is running on this machine.
   baseURL: (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api',
   headers: { 'Content-Type': 'application/json' },
 });

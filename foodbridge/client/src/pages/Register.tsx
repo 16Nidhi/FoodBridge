@@ -64,7 +64,8 @@ const Register: React.FC = () => {
         }));
         navigate(`/${user.role}-dashboard`);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Registration failed');
+        console.error('Register error (step1)', err);
+        setError((err.response && err.response.data && err.response.data.message) || err.message || 'Registration failed');
       } finally {
         setLoading(false);
       }
@@ -132,7 +133,8 @@ const Register: React.FC = () => {
       }));
       navigate(`/${user.role}-dashboard`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      console.error('Register error (step3)', err);
+      setError((err.response && err.response.data && err.response.data.message) || err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

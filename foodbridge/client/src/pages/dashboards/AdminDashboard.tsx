@@ -100,6 +100,7 @@ const AdminDashboard: React.FC = () => {
   const [apiError, setApiError]       = useState<string|null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string,boolean>>({});
   const [apiStats, setApiStats]       = useState<any>(null);
+  const [theme, setTheme]             = useState(localStorage.getItem('theme') || 'light');
 
   const displayName = user?.name || 'Admin';
   const initials    = user?.name ? user.name.split(' ').map((n:string)=>n[0]).join('').toUpperCase().slice(0,2) : 'AD';
@@ -108,6 +109,15 @@ const AdminDashboard: React.FC = () => {
     setToastMsg(msg); setToastType(type); setTimeout(() => setToastMsg(null), 3500);
   };
   const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   /* ── API fetch on mount ── */
   useEffect(() => {
@@ -235,6 +245,9 @@ const AdminDashboard: React.FC = () => {
   const pendingVerifs       = (apiStats?.pendingVerifications) ?? volunteerVerifications.filter(v => v.status === 'pending').length;
   const totalDeliveries     = apiStats?.totalDonations     ?? deliveries.length;
   const completedDeliveries = apiStats?.deliveredDonations ?? deliveries.filter(d => d.status === 'delivered').length;
+  const activePickups       = deliveries.filter(d => ['assigned', 'en_route', 'picked_up'].includes(d.status)).length;
+  const mealsSaved          = Math.floor(totalDonations * 2.5); // Example calculation
+
 
   const filteredUsers = users
     .filter(u => roleFilter==='all' || u.role===roleFilter)
@@ -417,6 +430,9 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
+            <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
             <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
             <span className="db-badge badge-green" style={{ fontSize:'0.8rem', padding:'5px 12px' }}>
               <i className="fas fa-circle" style={{ fontSize:'7px', marginRight:5 }}></i>{activeCount} Active
@@ -434,10 +450,10 @@ const AdminDashboard: React.FC = () => {
             </div>
           )}
           {apiError && (
-            <div className="db-card" style={{ marginBottom:20, border:'1.5px solid rgba(239,68,68,0.4)', background:'rgba(254,242,242,0.9)' }}>
+            <div className="db-card" style={{ marginBottom:20, border:'1px solid rgba(239,68,68,0.4)', background:'rgba(239,68,68,0.1)' }}>
               <div className="db-card-body" style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <i className="fas fa-circle-exclamation" style={{ color:'#EF4444', fontSize:'1.1rem' }}></i>
-                <span style={{ color:'#B91C1C', fontSize:'0.9rem' }}>{apiError}</span>
+                <span style={{ color:'#EF4444', fontSize:'0.9rem', fontWeight: 600 }}>{apiError}</span>
                 <button className="db-btn db-btn-sm" style={{ marginLeft:'auto', background:'#EF4444', color:'#fff' }} onClick={() => setApiError(null)}>Dismiss</button>
               </div>
             </div>
@@ -453,10 +469,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row">
                 {[
-                  { ico:'fa-users',        bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num: apiStats?.totalUsers ?? users.length,            lbl:'Total Users',       delta:activeCount + ' active' },
-                  { ico:'fa-box-open',     bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num: apiStats?.totalDonations ?? totalDonations,       lbl:'Total Donations',   delta:'All food listed' },
-                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num: totalDeliveries,                                  lbl:'Total Deliveries',  delta:completedDeliveries + ' completed' },
-                  { ico:'fa-seedling',     bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num: apiStats?.activeDonations != null ? apiStats.activeDonations + ' active' : '532 kg', lbl:'Food Rescued', delta:'Saved from waste' },
+                  { ico:'fa-box-open',     bg:'rgba(34,197,94,0.1)', color:'var(--c-primary)',   num: totalDonations,       lbl:'Total Donations',   delta:'+12% this week' },
+                  { ico:'fa-utensils',     bg:'rgba(59,130,246,0.1)', color:'var(--c-secondary)', num: mealsSaved,          lbl:'Meals Saved',       delta:'+8% this week' },
+                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num: activePickups,        lbl:'Active Pickups',    delta:'in progress' },
+                  { ico:'fa-users',        bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num: apiStats?.totalUsers ?? users.length, lbl:'Total Users', delta:activeCount + ' active' },
                 ].map((s, i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -471,40 +487,71 @@ const AdminDashboard: React.FC = () => {
                 ))}
               </div>
 
-              {/* Pending volunteer verifications alert */}
+              {/* Pending Alerts */}
               {pendingVerifs > 0 && (
-                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(37,99,235,0.3)', background:'rgba(239,246,255,0.9)' }}>
+                <div className="db-card" style={{ marginBottom:24, border:'1px solid rgba(59,130,246,0.3)', background:'rgba(59,130,246,0.05)' }}>
                   <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(37,99,235,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(59,130,246,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         <i className="fas fa-id-card" style={{ color:'var(--c-secondary)', fontSize:'1.1rem' }}></i>
                       </div>
                       <div>
-                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'#1e3a8a' }}>{pendingVerifs} Pending Volunteer Verification{pendingVerifs>1?'s':''}</div>
-                        <div style={{ fontSize:'0.82rem', color:'#1d4ed8' }}>Review submitted ID documents and verify volunteers</div>
+                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'var(--c-text)' }}>{pendingVerifs} Pending Volunteer Verification{pendingVerifs>1?'s':''}</div>
+                        <div style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>Review submitted ID documents and verify volunteers</div>
                       </div>
                     </div>
-                    <button className="db-btn db-btn-sm" style={{ background:'#2563EB', color:'#fff' }} onClick={() => setTab('verifications')}>
+                    <button className="db-btn db-btn-secondary db-btn-sm" onClick={() => setTab('verifications')}>
                       Review Now <i className="fas fa-arrow-right"></i>
                     </button>
                   </div>
                 </div>
               )}
 
+              {/* Recent Activity Panel */}
+              <div className="db-card" style={{ marginBottom: 32 }}>
+                <div className="db-card-header">
+                  <h3 className="db-card-title"><i className="fas fa-history"></i> Recent Activity</h3>
+                  <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => setTab('deliveries')}>View All</button>
+                </div>
+                <div className="db-card-body" style={{ padding: 0 }}>
+                  <table className="db-table">
+                     <thead>
+                       <tr>
+                         <th>Date</th>
+                         <th>Activity</th>
+                         <th>User</th>
+                         <th>Status</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {deliveries.slice(0, 5).map((d, i) => (
+                          <tr key={i}>
+                            <td style={{ fontSize: '0.85rem', color: 'var(--c-muted)' }}>{d.date}</td>
+                            <td style={{ fontWeight: 500 }}>Donation: {d.item}</td>
+                            <td>{d.donor}</td>
+                            <td><span className={`db-badge ${DELIVERY_STATUS_BADGE[d.status] || 'badge-gray'}`}>{d.status.replace('_', ' ')}</span></td>
+                          </tr>
+                       ))}
+                       {deliveries.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: 20 }}>No recent activity found.</td></tr>}
+                     </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* Pending NGO registrations alert */}
               {pendingNgos > 0 && (
-                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(249,115,22,0.3)', background:'rgba(255,247,237,0.8)' }}>
+                <div className="db-card" style={{ marginBottom:24, border:'1px solid rgba(249,115,22,0.3)', background:'rgba(249,115,22,0.05)' }}>
                   <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                       <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(249,115,22,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         <i className="fas fa-clock" style={{ color:'var(--c-accent)', fontSize:'1.1rem' }}></i>
                       </div>
                       <div>
-                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'#92400E' }}>{pendingNgos} Pending NGO Registration{pendingNgos>1?'s':''}</div>
-                        <div style={{ fontSize:'0.82rem', color:'#B45309' }}>Review and approve/reject NGO applications</div>
+                        <div style={{ fontWeight:700, fontSize:'0.95rem', color:'var(--c-text)' }}>{pendingNgos} Pending NGO Registration{pendingNgos>1?'s':''}</div>
+                        <div style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>Review and approve/reject NGO applications</div>
                       </div>
                     </div>
-                    <button className="db-btn db-btn-sm" style={{ background:'#F97316', color:'#fff' }} onClick={() => setTab('ngos')}>
+                    <button className="db-btn db-btn-sm" style={{ background:'var(--c-accent)', color:'#fff' }} onClick={() => setTab('ngos')}>
                       Review Now <i className="fas fa-arrow-right"></i>
                     </button>
                   </div>

@@ -26,6 +26,19 @@ const testimonials = [
   { name: "Ananya Singh", role: "Volunteer",                 text: "My weekend pickups feel meaningful. The map UI is so smooth — I can do 3 pickups in 2 hours easily.", avatar: "🧑‍🤝‍🧑" },
 ];
 
+const impactStories = [
+  { img: "🍲", title: "A Second Chance for 500 Meals", ngo: "City Shelter", people: 500, story: "Leftover banquet food from a tech conference was safely transported within 45 minutes, feeding hundreds of families in need." },
+  { img: "🥪", title: "Weekly Bakery Rescues", ngo: "Morning Hope", people: 120, story: "Freshly baked surplus bread from downtown cafes is now automatically routed to local orphanages every single evening." },
+  { img: "🍱", title: "Corporate Lunch Saved", ngo: "TechCare", people: 85, story: "Daily cafeteria excesses from a fortune 500 company have found a steady pipeline straight to elder care homes across the city." }
+];
+
+const topVolunteers = [
+  { rank: 1, name: "Arjun Desai", deliveries: 142, rating: "4.9", badge: "🥇" },
+  { rank: 2, name: "Sara Khan", deliveries: 128, rating: "4.9", badge: "🥈" },
+  { rank: 3, name: "David Chen", deliveries: 115, rating: "4.8", badge: "🥉" },
+  { rank: 4, name: "Priya Sharma", deliveries: 98, rating: "4.8", badge: "🏅" }
+];
+
 function Counter({ target, suffix }: { target: number; suffix: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -57,7 +70,13 @@ function Counter({ target, suffix }: { target: number; suffix: string }) {
 
 const Home = () => {
   useEffect(() => {
-    AOS.init({ duration: 700, easing: "ease-out-cubic", once: true, offset: 60 });
+    AOS.init({ 
+      duration: 850, 
+      easing: "ease-out-cubic", 
+      once: true, 
+      offset: 80,
+      delay: 50
+    });
   }, []);
 
   return (
@@ -68,6 +87,9 @@ const Home = () => {
           <div className="orb orb-a"></div>
           <div className="orb orb-b"></div>
           <div className="orb orb-c"></div>
+          <div className="shape shape-1"></div>
+          <div className="shape shape-2"></div>
+          <div className="shape shape-3"></div>
         </div>
         <div className="home-hero__inner container">
           <div className="hero-content">
@@ -116,23 +138,32 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="home-how container">
-        <span className="pill pill-green" data-aos="fade-up">How It Works</span>
-        <h2 className="section-title" data-aos="fade-up" data-aos-delay="60">The <span className="grad">FoodBridge</span> Flow</h2>
-        <div className="flow-grid">
-          {[
-            { n:"01", icon:"🍽️", color:"#10B981", title:"Log Food",     desc:"Donors log surplus food with photo, quantity and expiry window." },
-            { n:"02", icon:"🚴", color:"#2563EB", title:"Pickup",       desc:"Volunteers get notified, accept pickup and navigate via map." },
-            { n:"03", icon:"🏢", color:"#F97316", title:"NGO Receives", desc:"NGOs receive & verify the donation straight into their dashboard." },
-            { n:"04", icon:"🎉", color:"#8B5CF6", title:"Meals Served", desc:"Food reaches families, shelters & communities — zero waste." },
-          ].map((s, i) => (
-            <div className="flow-step glass-card" key={s.n} data-aos="fade-up" data-aos-delay={i * 100}>
-              <div className="step-num">{s.n}</div>
-              <div className="step-icon" style={{ background: s.color }}>{s.icon}</div>
-              <h3>{s.title}</h3>
-              <p>{s.desc}</p>
-            </div>
-          ))}
+      <section className="home-journey">
+        <div className="container">
+          <div className="journey-header">
+            <span className="pill pill-green" data-aos="fade-up">The Journey</span>
+            <h2 className="section-title" data-aos="fade-up" data-aos-delay="60">How <span className="grad">FoodBridge</span> Works</h2>
+          </div>
+          <div className="timeline">
+            {[
+              { n:"01", icon:"🍽️", title:"Donor posts surplus food", desc:"Restaurants log leftover food with photo, quantity and expiry window in just 2 minutes." },
+              { n:"02", icon:"🚴", title:"Volunteer accepts pickup", desc:"Local verified volunteers get instant pings, accept the run and navigate via the live map." },
+              { n:"03", icon:"✅", title:"Food safely collected", desc:"Volunteers arrive at the venue, verify the meal quality and secure the package for transit." },
+              { n:"04", icon:"🏢", title:"Delivered to NGO", desc:"The NGO receives the delivery straight into their dashboard, confirming safe arrival." },
+              { n:"05", icon:"🎉", title:"Meals served to communities", desc:"Nutritious food reaches families, shelters and communities before it goes to waste." },
+            ].map((s, i) => (
+              <div className="timeline-item" key={s.n} data-aos={i % 2 === 0 ? "fade-right" : "fade-left"} data-aos-delay={i * 100}>
+                <div className="timeline-icon">
+                  <div className="t-icon-inner">{s.icon}</div>
+                </div>
+                <div className="timeline-content glass-card">
+                  <span className="t-num">{s.n}</span>
+                  <h3>{s.title}</h3>
+                  <p>{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -177,14 +208,67 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="home-cta" data-aos="fade-up">
-        <div className="container cta-inner">
-          <div className="cta-badge">🚀 Join 500+ Members</div>
-          <h2>Ready to Make a Difference?</h2>
-          <p>Join thousands of donors, volunteers and NGOs already using FoodBridge.</p>
-          <div className="cta-btns">
-            <Link to="/register" className="hbtn hbtn-white">❤️ Donate Food Today</Link>
-            <Link to="/register" className="hbtn hbtn-outline">👥 Join as Volunteer</Link>
+      <section className="home-impact">
+        <div className="container">
+          <span className="pill pill-blue" data-aos="fade-up">Real impact</span>
+          <h2 className="section-title" data-aos="fade-up" data-aos-delay="60">Stories of <span className="accent">Change</span></h2>
+          <div className="impact-grid">
+            {impactStories.map((story, i) => (
+              <div className="impact-card glass-card" key={i} data-aos="fade-up" data-aos-delay={i * 100}>
+                <div className="impact-img">{story.img}</div>
+                <div className="impact-body">
+                  <h3>{story.title}</h3>
+                  <p>{story.story}</p>
+                  <div className="impact-meta">
+                    <span>🏢 {story.ngo}</span>
+                    <span>🫂 {story.people} helped</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="home-leaderboard">
+        <div className="container">
+          <div className="lb-header">
+            <div>
+              <span className="pill pill-green" data-aos="fade-up">Community</span>
+              <h2 className="section-title" data-aos="fade-up" data-aos-delay="60">Top <span className="grad">Hunger Heroes</span></h2>
+            </div>
+            <Link to="/register" className="hbtn hbtn-secondary" data-aos="fade-left">Join the squad</Link>
+          </div>
+          <div className="lb-grid">
+            {topVolunteers.map((vol, i) => (
+              <div className="lb-card glass-card" key={vol.rank} data-aos="flip-up" data-aos-delay={i * 80}>
+                <div className="lb-rank">{vol.badge}</div>
+                <div className="lb-info">
+                  <h4>{vol.name}</h4>
+                  <span>⭐ {vol.rating}</span>
+                </div>
+                <div className="lb-score">
+                  <strong>{vol.deliveries}</strong> 
+                  <small>Deliveries</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="home-cta-new" data-aos="fade-up">
+        <div className="container">
+          <div className="cta-new-inner glass-card">
+            <div className="cta-head">
+              <h2>Start Your <span className="grad">Impact Journey</span> Today.</h2>
+              <p>Whether you're a restaurant with surplus food, an NGO needing meals, or a volunteer wanting to help — there's a place for you.</p>
+            </div>
+            <div className="cta-actions">
+              <Link to="/register" className="hbtn hbtn-primary">❤️ Donate Food</Link>
+              <Link to="/register" className="hbtn hbtn-secondary">🚴 Become Volunteer</Link>
+              <Link to="/register" className="hbtn hbtn-outline-dark">🏢 Partner as NGO</Link>
+            </div>
           </div>
         </div>
       </section>

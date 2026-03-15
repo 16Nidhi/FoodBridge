@@ -7,6 +7,7 @@ import './Navbar.css';
 const Navbar: React.FC = () => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled]  = useState(false);
+    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
     const location = useLocation();
     const navigate = useNavigate();
     const dispatch = useDispatch();
@@ -19,6 +20,15 @@ const Navbar: React.FC = () => {
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    };
+
     // Close mobile menu on route change
     useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
@@ -28,6 +38,9 @@ const Navbar: React.FC = () => {
         navigate('/');
     };
 
+    // Include the dark mode toggle even if we are not rendering the full navbar on dashboard.
+    // Actually, on dashboard we might want it too. Let's add it to dashboard sidebar or topbar if possible, 
+    // but for now let's just make it available in the main Navbar. If `isDashboard`, we usually return null.
     if (isDashboard) return null;
 
     return (
@@ -44,6 +57,9 @@ const Navbar: React.FC = () => {
                 </ul>
 
                 <div className="fb-actions">
+                    <button className="nav-btn nav-btn-ghost theme-toggle" onClick={toggleTheme} aria-label="Toggle theme" style={{ padding: '8px', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {theme === 'light' ? '🌙' : '☀️'}
+                    </button>
                     {user ? (
                         <>
                             <span className="nav-role-badge">{user.role}</span>

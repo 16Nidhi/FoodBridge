@@ -37,6 +37,7 @@ const Login: React.FC = () => {
       }));
       navigate(`/${user.role}-dashboard`);
     } catch (err: any) {
+      console.error('Login error', err);
       // Fallback to demo credentials for quick previews
       const match = DEMO_CREDENTIALS[email.toLowerCase()];
       if (match) {
@@ -44,7 +45,7 @@ const Login: React.FC = () => {
         navigate(`/${match.role}-dashboard`);
         return;
       }
-      setError(err.response?.data?.message || 'Login failed.');
+      setError((err.response && err.response.data && err.response.data.message) || err.message || 'Login failed.');
     }
   };
 
