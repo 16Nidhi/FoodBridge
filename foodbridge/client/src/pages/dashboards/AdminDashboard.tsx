@@ -257,17 +257,17 @@ const AdminDashboard: React.FC = () => {
   const lineData = {
     labels: MONTHS,
     datasets:[
-      { label:'Donations',  data:[42,65,78,91,110,136,158], borderColor:'#10B981', backgroundColor:'rgba(16,185,129,0.12)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#10B981' },
-      { label:'Meals Saved',data:[380,590,760,840,990,1240,1430], borderColor:'#2563EB', backgroundColor:'rgba(37,99,235,0.09)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#2563EB', yAxisID:'y2' },
+      { label:'Donations',  data:[42,65,78,91,110,136,158], borderColor:'var(--c-primary)', backgroundColor:'var(--chip-success)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'var(--c-primary)' },
+      { label:'Meals Saved',data:[380,590,760,840,990,1240,1430], borderColor:'var(--c-secondary)', backgroundColor:'var(--chip-info)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'var(--c-secondary)', yAxisID:'y2' },
     ],
   };
   const lineOpts: any = {
     responsive:true, maintainAspectRatio:false,
     plugins:{ legend:{ position:'top' as const } },
     scales:{
-      y:  { grid:{color:'rgba(0,0,0,0.04)'}, ticks:{color:'#64748B'}, title:{display:true,text:'Donations',color:'#10B981'} },
-      y2: { position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#64748B'}, title:{display:true,text:'Meals',color:'#2563EB'} },
-      x:  { grid:{display:false}, ticks:{color:'#64748B'} },
+      y:  { grid:{color:'rgba(0,0,0,0.04)'}, ticks:{color:'var(--c-muted)'}, title:{display:true,text:'Donations',color:'var(--c-primary)'} },
+      y2: { position:'right', grid:{drawOnChartArea:false}, ticks:{color:'var(--c-muted)'}, title:{display:true,text:'Meals',color:'var(--c-secondary)'} },
+      x:  { grid:{display:false}, ticks:{color:'var(--c-muted)'} },
     },
   };
 
@@ -276,21 +276,21 @@ const AdminDashboard: React.FC = () => {
     datasets:[{
       label:'Donations Made',
       data:[51,38,14,8,23,19],
-      backgroundColor:['#10B981','#2563EB','#F97316','#8B5CF6','#EF4444','#F59E0B'],
+      backgroundColor:['var(--c-primary)','var(--c-secondary)','var(--c-accent)','var(--c-purple)','var(--c-danger)','var(--c-warning)'],
       borderRadius:6, borderSkipped:false,
     }],
   };
   const barOpts: any = {
     responsive:true, maintainAspectRatio:false, indexAxis:'y' as const,
     plugins:{ legend:{display:false} },
-    scales:{ x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#64748B'}}, y:{grid:{display:false},ticks:{color:'#64748B'}} },
+    scales:{ x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'var(--c-muted)'}}, y:{grid:{display:false},ticks:{color:'var(--c-muted)'}} },
   };
 
   const roleDoughnut = {
     labels:['Donors','Volunteers','NGOs','Admins'],
     datasets:[{
       data:[donors.length, volunteers.length, ngos.length, 1],
-      backgroundColor:['#10B981','#F97316','#2563EB','#8B5CF6'],
+      backgroundColor:['var(--c-primary)','var(--c-accent)','var(--c-secondary)','var(--c-purple)'],
       borderWidth:2, borderColor:'#fff',
     }],
   };
@@ -305,14 +305,14 @@ const AdminDashboard: React.FC = () => {
     datasets:[{
       label:'New Users',
       data:[8,13,11,18,15,22,10],
-      backgroundColor:'rgba(139,92,246,0.7)',
+      backgroundColor:'var(--c-purple)',
       borderRadius:6, borderSkipped:false,
     }],
   };
   const growthOpts: any = {
     responsive:true, maintainAspectRatio:false,
     plugins:{ legend:{display:false} },
-    scales:{ x:{grid:{display:false},ticks:{color:'#64748B'}}, y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#64748B'}} },
+    scales:{ x:{grid:{display:false},ticks:{color:'var(--c-muted)'}}, y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'var(--c-muted)'}} },
   };
 
   /* ─── Reusable user table ─── */
@@ -327,12 +327,10 @@ const AdminDashboard: React.FC = () => {
             {data.map(u => (
               <tr key={u.id}>
                 <td>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10B981,#2563EB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.72rem', fontWeight:700, color:'#fff', flexShrink:0 }}>
+                    <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,var(--c-primary),var(--c-secondary))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.72rem', fontWeight:700, color:'var(--on-primary)', flexShrink:0 }}>
                       {u.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
                     </div>
                     <span style={{ fontWeight:500 }}>{u.name}</span>
-                  </div>
                 </td>
                 <td style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>{u.email}</td>
                 <td><span className={`db-badge ${ROLE_BADGE[u.role]}`}>{u.role}</span></td>
@@ -373,7 +371,7 @@ const AdminDashboard: React.FC = () => {
       <aside className={`db-sidebar${sidebarOpen ? ' open' : ''}`}>
         <Link to="/" className="db-logo"><i className="fas fa-leaf"></i> FoodBridge</Link>
         <nav className="db-nav">
-          <div className="db-nav-section">
+            <div className="db-nav-section">
             <div className="db-nav-label">Admin Menu</div>
             {([
               ['overview',       'fa-chart-line',   'Dashboard'],
@@ -397,13 +395,13 @@ const AdminDashboard: React.FC = () => {
             <div className="db-nav-label">System</div>
             <Link to="/settings" className="db-nav-item"><i className="fas fa-gear"></i> Settings</Link>
             <Link to="/"         className="db-nav-item"><i className="fas fa-earth-asia"></i> View Site</Link>
-            <button className="db-nav-item" style={{color:'#EF4444'}} onClick={handleLogout}>
+            <button className="db-nav-item" style={{color:'var(--c-danger)'}} onClick={handleLogout}>
               <i className="fas fa-right-from-bracket"></i> Logout
             </button>
           </div>
         </nav>
         <div className="db-user-block">
-          <div className="db-avatar" style={{ background:'linear-gradient(135deg,#8B5CF6,#2563EB)' }}>{initials}</div>
+          <div className="db-avatar" style={{ background:'linear-gradient(135deg,var(--c-purple),var(--c-secondary))' }}>{initials}</div>
           <div>
             <div className="db-user-name">{displayName}</div>
             <div className="db-user-role">Platform Admin</div>
@@ -430,9 +428,9 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-            <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
-              {theme === 'light' ? '🌙' : '☀️'}
-            </button>
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+                {theme === 'light' ? '☀️' : '🌙'}
+              </button>
             <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
             <span className="db-badge badge-green" style={{ fontSize:'0.8rem', padding:'5px 12px' }}>
               <i className="fas fa-circle" style={{ fontSize:'7px', marginRight:5 }}></i>{activeCount} Active
@@ -450,11 +448,11 @@ const AdminDashboard: React.FC = () => {
             </div>
           )}
           {apiError && (
-            <div className="db-card" style={{ marginBottom:20, border:'1px solid rgba(239,68,68,0.4)', background:'rgba(239,68,68,0.1)' }}>
+            <div className="db-card" style={{ marginBottom:20, border:'1px solid var(--c-danger)', background:'var(--chip-danger)' }}>
               <div className="db-card-body" style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <i className="fas fa-circle-exclamation" style={{ color:'#EF4444', fontSize:'1.1rem' }}></i>
-                <span style={{ color:'#EF4444', fontSize:'0.9rem', fontWeight: 600 }}>{apiError}</span>
-                <button className="db-btn db-btn-sm" style={{ marginLeft:'auto', background:'#EF4444', color:'#fff' }} onClick={() => setApiError(null)}>Dismiss</button>
+                <i className="fas fa-circle-exclamation" style={{ color:'var(--c-danger)', fontSize:'1.1rem' }}></i>
+                <span style={{ color:'var(--c-danger)', fontSize:'0.9rem', fontWeight: 600 }}>{apiError}</span>
+                <button className="db-btn db-btn-sm" style={{ marginLeft:'auto', background:'var(--c-danger)', color:'var(--on-primary)' }} onClick={() => setApiError(null)}>Dismiss</button>
               </div>
             </div>
           )}
@@ -469,10 +467,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row">
                 {[
-                  { ico:'fa-box-open',     bg:'rgba(34,197,94,0.1)', color:'var(--c-primary)',   num: totalDonations,       lbl:'Total Donations',   delta:'+12% this week' },
-                  { ico:'fa-utensils',     bg:'rgba(59,130,246,0.1)', color:'var(--c-secondary)', num: mealsSaved,          lbl:'Meals Saved',       delta:'+8% this week' },
-                  { ico:'fa-truck-fast',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num: activePickups,        lbl:'Active Pickups',    delta:'in progress' },
-                  { ico:'fa-users',        bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num: apiStats?.totalUsers ?? users.length, lbl:'Total Users', delta:activeCount + ' active' },
+                  { ico:'fa-box-open',     bg:'var(--chip-success)', color:'var(--c-primary)',   num: totalDonations,       lbl:'Total Donations',   delta:'+12% this week' },
+                  { ico:'fa-utensils',     bg:'var(--chip-info)',    color:'var(--c-secondary)', num: mealsSaved,          lbl:'Meals Saved',       delta:'+8% this week' },
+                  { ico:'fa-truck-fast',   bg:'var(--chip-warning)', color:'var(--c-accent)',    num: activePickups,        lbl:'Active Pickups',    delta:'in progress' },
+                  { ico:'fa-users',        bg:'var(--chip-info)',    color:'var(--c-purple)',   num: apiStats?.totalUsers ?? users.length, lbl:'Total Users', delta:activeCount + ' active' },
                 ].map((s, i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -489,10 +487,10 @@ const AdminDashboard: React.FC = () => {
 
               {/* Pending Alerts */}
               {pendingVerifs > 0 && (
-                <div className="db-card" style={{ marginBottom:24, border:'1px solid rgba(59,130,246,0.3)', background:'rgba(59,130,246,0.05)' }}>
+                <div className="db-card" style={{ marginBottom:24, border:'1px solid var(--c-border)', background:'var(--chip-info)' }}>
                   <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(59,130,246,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:42, height:42, borderRadius:'50%', background:'var(--chip-info)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         <i className="fas fa-id-card" style={{ color:'var(--c-secondary)', fontSize:'1.1rem' }}></i>
                       </div>
                       <div>
@@ -540,10 +538,10 @@ const AdminDashboard: React.FC = () => {
 
               {/* Pending NGO registrations alert */}
               {pendingNgos > 0 && (
-                <div className="db-card" style={{ marginBottom:24, border:'1px solid rgba(249,115,22,0.3)', background:'rgba(249,115,22,0.05)' }}>
+                <div className="db-card" style={{ marginBottom:24, border:'1px solid var(--c-border)', background:'var(--chip-warning)' }}>
                   <div className="db-card-body" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:42, height:42, borderRadius:'50%', background:'rgba(249,115,22,0.15)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:42, height:42, borderRadius:'50%', background:'var(--chip-warning)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         <i className="fas fa-clock" style={{ color:'var(--c-accent)', fontSize:'1.1rem' }}></i>
                       </div>
                       <div>
@@ -623,10 +621,10 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="db-stats-row" style={{ marginBottom:24 }}>
                 {[
-                  { ico:'fa-users',    bg:'rgba(16,185,129,0.1)',  color:'var(--c-primary)',   num:donors.length,                    lbl:'Total Donors',     delta:'' },
-                  { ico:'fa-box-open', bg:'rgba(37,99,235,0.1)',   color:'var(--c-secondary)', num:totalDonations,                   lbl:'Total Donations',  delta:'Combined' },
-                  { ico:'fa-circle-check',bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',   num:donors.filter(d=>d.status==='active').length, lbl:'Active', delta:'Online now' },
-                  { ico:'fa-star',     bg:'rgba(139,92,246,0.1)',  color:'#8B5CF6',            num:donors.sort((a,b)=>(b.donations||0)-(a.donations||0))[0]?.name.split(' ')[0]||'—', lbl:'Top Donor', delta:'Most donations' },
+                  { ico:'fa-users',    bg:'var(--chip-success)',  color:'var(--c-primary)',   num:donors.length,                    lbl:'Total Donors',     delta:'' },
+                  { ico:'fa-box-open', bg:'var(--chip-info)',     color:'var(--c-secondary)', num:totalDonations,                   lbl:'Total Donations',  delta:'Combined' },
+                  { ico:'fa-circle-check',bg:'var(--chip-warning)',color:'var(--c-accent)',   num:donors.filter(d=>d.status==='active').length, lbl:'Active', delta:'Online now' },
+                  { ico:'fa-star',     bg:'var(--chip-info)',  color:'var(--c-purple)',            num:donors.sort((a,b)=>(b.donations||0)-(a.donations||0))[0]?.name.split(' ')[0]||'—', lbl:'Top Donor', delta:'Most donations' },
                 ].map((s,i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
@@ -647,10 +645,10 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="db-stats-row" style={{ marginBottom:24 }}>
                 {[
-                  { ico:'fa-users',        bg:'rgba(37,99,235,0.1)', color:'var(--c-secondary)', num:volunteers.length,                      lbl:'Total Volunteers', delta:'' },
-                  { ico:'fa-motorcycle',   bg:'rgba(249,115,22,0.1)',color:'var(--c-accent)',    num:totalPickups,                           lbl:'Total Pickups',    delta:'Combined' },
-                  { ico:'fa-circle-check', bg:'rgba(16,185,129,0.1)',color:'var(--c-primary)',   num:volunteers.filter(v=>v.status==='active').length, lbl:'Active',  delta:'Available now' },
-                  { ico:'fa-star',         bg:'rgba(139,92,246,0.1)',color:'#8B5CF6',            num:volunteers.sort((a,b)=>(b.pickups||0)-(a.pickups||0))[0]?.name.split(' ')[0]||'—', lbl:'Top Volunteer', delta:'Most pickups' },
+                  { ico:'fa-users',        bg:'var(--chip-info)', color:'var(--c-secondary)', num:volunteers.length,                      lbl:'Total Volunteers', delta:'' },
+                  { ico:'fa-motorcycle',   bg:'var(--chip-warning)',color:'var(--c-accent)',    num:totalPickups,                           lbl:'Total Pickups',    delta:'Combined' },
+                  { ico:'fa-circle-check', bg:'var(--chip-success)',color:'var(--c-primary)',   num:volunteers.filter(v=>v.status==='active').length, lbl:'Active',  delta:'Available now' },
+                  { ico:'fa-star',         bg:'var(--chip-info)',color:'var(--c-purple)',            num:volunteers.sort((a,b)=>(b.pickups||0)-(a.pickups||0))[0]?.name.split(' ')[0]||'—', lbl:'Top Volunteer', delta:'Most pickups' },
                 ].map((s,i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
@@ -672,7 +670,7 @@ const AdminDashboard: React.FC = () => {
 
               {/* Pending Registrations */}
               {ngoRegistrations.filter(r => r.approvalStatus === 'pending').length > 0 && (
-                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid rgba(249,115,22,0.25)' }}>
+                <div className="db-card" style={{ marginBottom:24, border:'1.5px solid var(--c-border)' }}>
                   <div className="db-card-header">
                     <div className="db-card-title" style={{ color:'var(--c-accent)' }}>
                       <i className="fas fa-clock"></i> Pending NGO Registrations
@@ -682,7 +680,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="db-card-body" style={{ paddingTop:0 }}>
                     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                       {ngoRegistrations.filter(r => r.approvalStatus === 'pending').map(reg => (
-                        <div key={reg.id} style={{ background:'rgba(249,115,22,0.04)', border:'1px solid rgba(249,115,22,0.15)', borderRadius:'var(--r-sm)', padding:'16px 20px', display:'flex', flexWrap:'wrap', gap:16, alignItems:'center' }}>
+                        <div key={reg.id} style={{ background:'var(--chip-warning)', border:'1px solid var(--c-border)', borderRadius:'var(--r-sm)', padding:'16px 20px', display:'flex', flexWrap:'wrap', gap:16, alignItems:'center' }}>
                           <div style={{ flex:1, minWidth:220 }}>
                             <div style={{ fontWeight:700, fontSize:'0.95rem', marginBottom:4 }}>{reg.orgName}</div>
                             <div style={{ fontSize:'0.82rem', color:'var(--c-muted)', display:'flex', flexWrap:'wrap', gap:12 }}>
@@ -691,7 +689,7 @@ const AdminDashboard: React.FC = () => {
                               <span><i className="fas fa-location-dot" style={{ marginRight:4 }}></i>{reg.location}</span>
                               <span><i className="fas fa-calendar" style={{ marginRight:4 }}></i>{reg.appliedDate}</span>
                             </div>
-                            <div style={{ fontSize:'0.82rem', color:'#475569', marginTop:8, fontStyle:'italic' }}>"{reg.description}"</div>
+                            <div style={{ fontSize:'0.82rem', color:'var(--c-muted)', marginTop:8, fontStyle:'italic' }}>"{reg.description}"</div>
                           </div>
                           <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                             <button className="db-btn db-btn-success db-btn-sm" disabled={!!actionLoading[reg.id+':ngo']} onClick={() => handleNgoApproval(reg.id,'approved')}>
@@ -749,10 +747,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row" style={{ marginBottom:24 }}>
                 {[
-                  { ico:'fa-truck-fast',   bg:'rgba(16,185,129,0.1)',  color:'var(--c-primary)',   num:totalDeliveries,                                               lbl:'Total Deliveries',  delta:'All time' },
-                  { ico:'fa-circle-check', bg:'rgba(37,99,235,0.1)',   color:'var(--c-secondary)', num:completedDeliveries,                                           lbl:'Completed',         delta:'Successfully delivered' },
-                  { ico:'fa-spinner',      bg:'rgba(249,115,22,0.1)',  color:'var(--c-accent)',    num:deliveries.filter(d=>d.status==='en_route'||d.status==='picked_up').length, lbl:'In Progress', delta:'Currently moving' },
-                  { ico:'fa-circle-xmark', bg:'rgba(239,68,68,0.1)',   color:'#EF4444',            num:deliveries.filter(d=>d.status==='cancelled').length,           lbl:'Cancelled',         delta:'This period' },
+                  { ico:'fa-truck-fast',   bg:'var(--chip-success)',  color:'var(--c-primary)',   num:totalDeliveries,                                               lbl:'Total Deliveries',  delta:'All time' },
+                  { ico:'fa-circle-check', bg:'var(--chip-info)',   color:'var(--c-secondary)', num:completedDeliveries,                                           lbl:'Completed',         delta:'Successfully delivered' },
+                  { ico:'fa-spinner',      bg:'var(--chip-warning)',  color:'var(--c-accent)',    num:deliveries.filter(d=>d.status==='en_route'||d.status==='picked_up').length, lbl:'In Progress', delta:'Currently moving' },
+                  { ico:'fa-circle-xmark', bg:'var(--chip-danger)',   color:'var(--c-danger)',            num:deliveries.filter(d=>d.status==='cancelled').length,           lbl:'Cancelled',         delta:'This period' },
                 ].map((s,i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
@@ -796,10 +794,10 @@ const AdminDashboard: React.FC = () => {
 
               <div className="db-stats-row">
                 {[
-                  { ico:'fa-users',      bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:users.length,    lbl:'Total Users',     delta:'+10 this month' },
-                  { ico:'fa-box-open',   bg:'rgba(37,99,235,0.1)',  color:'var(--c-secondary)', num:totalDonations,  lbl:'All Donations',   delta:'Cumulative' },
-                  { ico:'fa-truck-fast', bg:'rgba(249,115,22,0.1)', color:'var(--c-accent)',    num:totalDeliveries, lbl:'All Deliveries',  delta:completedDeliveries + ' completed' },
-                  { ico:'fa-seedling',   bg:'rgba(139,92,246,0.1)', color:'#8B5CF6',            num:'532 kg',        lbl:'Food Rescued',    delta:'Prevented waste' },
+                  { ico:'fa-users',      bg:'var(--chip-success)', color:'var(--c-primary)',   num:users.length,    lbl:'Total Users',     delta:'+10 this month' },
+                  { ico:'fa-box-open',   bg:'var(--chip-info)',  color:'var(--c-secondary)', num:totalDonations,  lbl:'All Donations',   delta:'Cumulative' },
+                  { ico:'fa-truck-fast', bg:'var(--chip-warning)', color:'var(--c-accent)',    num:totalDeliveries, lbl:'All Deliveries',  delta:completedDeliveries + ' completed' },
+                  { ico:'fa-seedling',   bg:'var(--chip-info)', color:'var(--c-purple)',            num:'532 kg',        lbl:'Food Rescued',    delta:'Prevented waste' },
                 ].map((s,i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{background:s.bg}}><i className={`fas ${s.ico}`} style={{color:s.color}}></i></div>
@@ -842,9 +840,9 @@ const AdminDashboard: React.FC = () => {
               {/* Stats row */}
               <div className="db-stats-row" style={{ marginBottom:24 }}>
                 {[
-                  { ico:'fa-hourglass-half', bg:'rgba(249,115,22,0.1)', color:'var(--c-accent)',    num:pendingVerifs,    lbl:'Pending Review' },
-                  { ico:'fa-circle-check',   bg:'rgba(16,185,129,0.1)', color:'var(--c-primary)',   num:volunteerVerifications.filter(v=>v.status==='verified').length,  lbl:'Verified' },
-                  { ico:'fa-circle-xmark',   bg:'rgba(239,68,68,0.1)',  color:'#EF4444',           num:volunteerVerifications.filter(v=>v.status==='rejected').length,  lbl:'Rejected' },
+                  { ico:'fa-hourglass-half', bg:'var(--chip-warning)', color:'var(--c-accent)',    num:pendingVerifs,    lbl:'Pending Review' },
+                  { ico:'fa-circle-check',   bg:'var(--chip-success)', color:'var(--c-primary)',   num:volunteerVerifications.filter(v=>v.status==='verified').length,  lbl:'Verified' },
+                  { ico:'fa-circle-xmark',   bg:'var(--chip-danger)',  color:'var(--c-danger)',           num:volunteerVerifications.filter(v=>v.status==='rejected').length,  lbl:'Rejected' },
                 ].map((s,i) => (
                   <div className="db-stat-chip" key={i}>
                     <div className="db-stat-ico" style={{ background:s.bg }}>
@@ -869,8 +867,8 @@ const AdminDashboard: React.FC = () => {
                       <div key={v.id} style={{ border:'1px solid var(--c-border)', borderRadius:12, padding:20, background:'var(--c-surface)', display:'grid', gridTemplateColumns:'1fr auto', gap:16, alignItems:'start' }}>
                         <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
                           {/* ID preview */}
-                          <div style={{ width:110, height:80, borderRadius:8, background:'rgba(37,99,235,0.08)', border:'1.5px dashed #93C5FD', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-                            <i className="fas fa-id-card" style={{ fontSize:'2rem', color:'#93C5FD' }}></i>
+                          <div style={{ width:110, height:80, borderRadius:8, background:'var(--chip-info)', border:'1.5px dashed var(--c-secondary)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+                            <i className="fas fa-id-card" style={{ fontSize:'2rem', color:'var(--c-secondary)' }}></i>
                           </div>
                           <div style={{ flex:1, minWidth:200 }}>
                             <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:4 }}>{v.name}</div>
@@ -892,7 +890,7 @@ const AdminDashboard: React.FC = () => {
                         <div style={{ display:'flex', flexDirection:'column', gap:8, minWidth:130 }}>
                           <button
                             className="db-btn db-btn-sm"
-                            style={{ background:'#10B981', color:'#fff', width:'100%' }}
+                            style={{ background:'var(--c-primary)', color:'var(--on-primary)', width:'100%' }}
                             disabled={!!actionLoading[v.id+':verif']}
                             onClick={() => handleVerifAction(v.id, 'verified')}
                           >
@@ -900,7 +898,7 @@ const AdminDashboard: React.FC = () => {
                           </button>
                           <button
                             className="db-btn db-btn-sm"
-                            style={{ background:'#EF4444', color:'#fff', width:'100%' }}
+                            style={{ background:'var(--c-danger)', color:'var(--on-primary)', width:'100%' }}
                             disabled={!!actionLoading[v.id+':verif']}
                             onClick={() => handleVerifAction(v.id, 'rejected')}
                           >

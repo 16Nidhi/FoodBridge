@@ -182,6 +182,13 @@ const NgoDashboard: React.FC = () => {
     setToastType(type);
     setTimeout(() => setToastMsg(null), 3500);
   };
+
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
   const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
   const handleConfirmDelivery = (id: string) => {
@@ -384,7 +391,10 @@ const NgoDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-            <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+              <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
             {stats.available > 0 && (
               <span className="db-badge badge-orange" style={{ fontSize:'0.8rem', padding:'5px 12px' }}>
                 {stats.available} New

@@ -1,12 +1,10 @@
 import axios from 'axios';
 import type { FoodListing } from '../types';
 
+const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000';
+
 const api = axios.create({
-  // Prefer environment variable `VITE_API_URL` (example: http://localhost:5001)
-  // Default to backend on port 5001 as required by the project setup.
-  // If your backend runs on a different port set VITE_API_URL in .env
-  // Default to port 5000 where the backend is running on this machine.
-  baseURL: (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: `${BASE_URL}/api/`,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -19,22 +17,22 @@ api.interceptors.request.use((config) => {
 
 // ─── Auth ────────────────────────────────────────────────────
 export const authLogin = (email: string, password: string) =>
-  api.post('/auth/login', { email, password });
+  api.post('auth/login', { email, password });
 
 export const authRegister = (data: Record<string, string>) =>
-  api.post('/auth/register', data);
+  api.post('auth/register', data);
 
-export const getMe = () => api.get('/auth/me');
+export const getMe = () => api.get('auth/me');
 
 // ─── Donations (Donor) ───────────────────────────────────────
 export const createDonation = (data: {
   foodType: string; quantity: string; location: string; preparedTime: string;
-}) => api.post('/donations', data);
+}) => api.post('donations', data);
 
-export const getMyDonations = () => api.get('/donations/my-donations');
+export const getMyDonations = () => api.get('donations/my-donations');
 
 // ─── Donations (NGO / Volunteer / Admin) ─────────────────────
-export const getAllDonations = () => api.get('/donations');
+export const getAllDonations = () => api.get('donations');
 
 const mapDonationToFoodListing = (donation: any): FoodListing => ({
   id: donation._id || donation.id || '',
@@ -62,50 +60,50 @@ export const fetchFoodListings = async (): Promise<FoodListing[]> => {
 
 /** NGO accepts a donation and optionally assigns a volunteer */
 export const acceptDonation = (donationId: string, volunteerId?: string) =>
-  api.patch('/donations/accept', { donationId, ...(volunteerId ? { volunteerId } : {}) });
+  api.patch('donations/accept', { donationId, ...(volunteerId ? { volunteerId } : {}) });
 
 /** Volunteer self-accepts an open pickup */
 export const volunteerAcceptPickup = (donationId: string) =>
-  api.patch('/donations/volunteer-accept', { donationId });
+  api.patch('donations/volunteer-accept', { donationId });
 
 /** Volunteer marks food as picked up from donor */
 export const markPickedUp = (donationId: string) =>
-  api.patch('/donations/picked-up', { donationId });
+  api.patch('donations/picked-up', { donationId });
 
 /** NGO confirms food was delivered */
 export const markDelivered = (donationId: string) =>
-  api.patch('/donations/delivered', { donationId });
+  api.patch('donations/delivered', { donationId });
 
 // ─── Ratings ─────────────────────────────────────────────────
 export const addRating = (volunteerId: string, rating: number, review?: string) =>
-  api.post('/ratings', { volunteerId, rating, review });
+  api.post('ratings', { volunteerId, rating, review });
 
 export const getVolunteerRatings = (volunteerId: string) =>
-  api.get(`/ratings/${volunteerId}`);
+  api.get(`ratings/${volunteerId}`);
 
 // ─── Admin ───────────────────────────────────────────────────
 export const adminGetUsers = (role?: string) =>
-  api.get('/admin/users', { params: role ? { role } : {} });
+  api.get('admin/users', { params: role ? { role } : {} });
 
 export const adminGetDonations = (status?: string) =>
-  api.get('/admin/donations', { params: status ? { status } : {} });
+  api.get('admin/donations', { params: status ? { status } : {} });
 
-export const adminGetStats = () => api.get('/admin/stats');
+export const adminGetStats = () => api.get('admin/stats');
 
 export const adminGetVerifications = (status?: string) =>
-  api.get('/admin/verifications', { params: status ? { status } : {} });
+  api.get('admin/verifications', { params: status ? { status } : {} });
 
 export const adminReviewVerification = (id: string, status: 'approved' | 'rejected') =>
-  api.patch(`/admin/verifications/${id}`, { status });
+  api.patch(`admin/verifications/${id}`, { status });
 
 export const adminUpdateUserStatus = (id: string, status: 'active' | 'suspended') =>
-  api.patch(`/admin/users/${id}/status`, { status });
+  api.patch(`admin/users/${id}/status`, { status });
 
 export const adminUpdateUserVerification = (id: string, verificationStatus: 'approved' | 'rejected') =>
-  api.patch(`/admin/users/${id}/verify`, { verificationStatus });
+  api.patch(`admin/users/${id}/verify`, { verificationStatus });
 
 // ─── Verifications (Volunteer) ────────────────────────────────
 export const submitVerification = (idDocument: string) =>
-  api.post('/verifications', { idDocument });
+  api.post('verifications', { idDocument });
 
 export default api;

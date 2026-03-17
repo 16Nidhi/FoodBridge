@@ -58,7 +58,7 @@ const Navbar: React.FC = () => {
 
                 <div className="fb-actions">
                     <button className="nav-btn nav-btn-ghost theme-toggle" onClick={toggleTheme} aria-label="Toggle theme" style={{ padding: '8px', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {theme === 'light' ? '🌙' : '☀️'}
+                        {theme === 'light' ? '☀️' : '🌙'}
                     </button>
                     {user ? (
                         <>

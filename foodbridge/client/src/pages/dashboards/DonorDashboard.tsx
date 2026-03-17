@@ -124,6 +124,13 @@ const DonorDashboard: React.FC = () => {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
   /* handle form field changes */
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
@@ -308,7 +315,10 @@ const DonorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-            <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+              <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
             {tab !== 'settings' && tab !== 'profile' && (
               <button className="db-btn db-btn-primary db-btn-sm" onClick={() => { setEditId(null); setForm(blank); setPreviewURL(null); setTab('donate'); }}>
                 <i className="fas fa-plus"></i> Quick Donate
