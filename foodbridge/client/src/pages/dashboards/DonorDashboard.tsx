@@ -125,11 +125,8 @@ const DonorDashboard: React.FC = () => {
   };
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  
+  
 
   /* handle form field changes */
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -226,7 +223,7 @@ const DonorDashboard: React.FC = () => {
   donations.forEach(d => { catCounts[d.category] = (catCounts[d.category]||0) + 1; });
   const doughnutData = {
     labels: Object.keys(catCounts),
-    datasets:[{ data: Object.values(catCounts), backgroundColor: Object.keys(catCounts).map(c => CATEGORY_COLORS[c]||'#94A3B8'), borderWidth:2, borderColor:'#fff' }],
+    datasets:[{ data: Object.values(catCounts), backgroundColor: Object.keys(catCounts).map(c => CATEGORY_COLORS[c]||'#94A3B8'), borderWidth:2, borderColor:'var(--card-bg)' }],
   };
   const doughnutOpts: any = {
     responsive:true, maintainAspectRatio:false,
@@ -315,7 +312,12 @@ const DonorDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }} aria-label="Toggle theme">
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
               <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>

@@ -83,7 +83,7 @@ const Listings: React.FC = () => {
             )}
 
             {listings.length === 0 && (
-                <div style={{ border: '1px dashed #CBD5E1', borderRadius: 8, padding: 16, color: '#475569', marginBottom: 12 }}>
+                <div style={{ border: '1px dashed var(--border-color)', borderRadius: 8, padding: 16, color: 'var(--text-secondary)', marginBottom: 12 }}>
                     No listings available yet.
                 </div>
             )}

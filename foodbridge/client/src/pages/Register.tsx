@@ -163,8 +163,8 @@ const Register: React.FC = () => {
                     <div style={{
                       width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
                       fontSize:'0.8rem', fontWeight:700,
-                      background: done ? '#10B981' : active ? '#2563EB' : '#E2E8F0',
-                      color: done || active ? '#fff' : '#94A3B8',
+                      background: done ? '#10B981' : active ? '#2563EB' : 'var(--border-color)',
+                      color: done || active ? 'var(--card-bg)' : '#94A3B8',
                       transition: 'all 0.3s',
                     }}>
                       {done ? '✓' : idx}
@@ -174,7 +174,7 @@ const Register: React.FC = () => {
                     </span>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div style={{ height:2, flex:1, background: step > idx ? '#10B981' : '#E2E8F0', transition:'background 0.3s', marginBottom:20 }} />
+                    <div style={{ height:2, flex:1, background: step > idx ? '#10B981' : 'var(--border-color)', transition:'background 0.3s', marginBottom:20 }} />
                   )}
                 </React.Fragment>
               );
@@ -268,7 +268,7 @@ const Register: React.FC = () => {
 
             <div style={{ display:'flex', gap:10, marginTop:8 }}>
               <button type="button" className="auth-submit"
-                style={{ background:'#F1F5F9', color:'#475569', flex:1 }}
+                style={{ background:'#F1F5F9', color:'var(--text-secondary)', flex:1 }}
                 onClick={() => { setStep(1); setError(''); }}>
                 ← Back
               </button>
@@ -302,7 +302,7 @@ const Register: React.FC = () => {
                 onDragLeave={() => setDragOver(false)}
                 onDrop={e => { e.preventDefault(); setDragOver(false); handleIdFile(e.dataTransfer.files[0]); }}
                 style={{
-                  border: `2px dashed ${dragOver ? '#10B981' : idFile ? '#10B981' : '#E2E8F0'}`,
+                  border: `2px dashed ${dragOver ? '#10B981' : idFile ? '#10B981' : 'var(--border-color)'}`,
                   borderRadius: 12, padding:'20px 16px', textAlign:'center', cursor:'pointer',
                   background: dragOver ? 'rgba(16,185,129,0.04)' : idFile ? 'rgba(16,185,129,0.04)' : '#FAFBFF',
                   transition:'all 0.25s',
@@ -336,7 +336,7 @@ const Register: React.FC = () => {
 
             <div style={{ display:'flex', gap:10, marginTop:8 }}>
               <button type="button" className="auth-submit"
-                style={{ background:'#F1F5F9', color:'#475569', flex:1 }}
+                style={{ background:'#F1F5F9', color:'var(--text-secondary)', flex:1 }}
                 onClick={() => { setStep(2); setError(''); }}>
                 ← Back
               </button>

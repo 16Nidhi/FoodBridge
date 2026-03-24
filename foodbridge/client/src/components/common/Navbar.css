@@ -34,12 +34,12 @@
   gap: 8px;
   font-size: 1.35rem;
   font-weight: 800;
-  color: #10B981;
+  color: var(--accent);
   flex-shrink: 0;
   text-decoration: none;
 }
 .fb-brand svg,
-.fb-brand .leaf { color: #10B981; font-size: 1.15rem; }
+.fb-brand .leaf { color: var(--accent); font-size: 1.15rem; }
 
 /* Nav links */
 .fb-links {
@@ -56,12 +56,12 @@
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-secondary);
   text-decoration: none;
   transition: background 0.2s, color 0.2s, transform 0.2s;
 }
 .fb-links a:hover {
-  color: #10B981;
+  color: var(--accent);
   background: rgba(16,185,129,0.08);
   transform: translateY(-1px);
 }
@@ -89,16 +89,16 @@
 }
 .nav-btn-ghost {
   background: transparent;
-  color: #475569;
-  border: 1.5px solid #E2E8F0;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border-color);
 }
 .nav-btn-ghost:hover {
-  border-color: #10B981;
-  color: #10B981;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .nav-btn-primary {
-  background: linear-gradient(90deg,#10B981,#059669);
-  color: #fff;
+  background: linear-gradient(90deg,var(--accent),#059669);
+  color: var(--text-primary);
   box-shadow: 0 6px 24px rgba(16,185,129,0.25);
 }
 .nav-btn-primary:hover {
@@ -121,7 +121,7 @@
   display: block;
   width: 22px;
   height: 2px;
-  background: #475569;
+  background: var(--text-secondary);
   border-radius: 2px;
   transition: all 0.25s;
 }
@@ -133,19 +133,19 @@
   font-size: 0.75rem;
   font-weight: 700;
   background: rgba(16,185,129,0.1);
-  color: #10B981;
+  color: var(--accent);
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 /* Active link */
 .fb-links a.active {
-  color: #10B981;
+  color: var(--accent);
   background: rgba(16,185,129,0.08);
 }
 
 .fb-nav.scrolled {
-  background: rgba(255,255,255,0.96);
+  background: var(--card-bg);
   box-shadow: 0 4px 32px rgba(2,6,23,0.10);
 }
 
@@ -165,7 +165,7 @@
     top: 66px; left: 0; right: 0;
     background: rgba(248,250,252,0.98);
     backdrop-filter: blur(22px);
-    border-bottom: 1px solid #E2E8F0;
+    border-bottom: 1px solid var(--border-color);
     padding: 16px 20px;
     box-shadow: 0 12px 40px rgba(2,6,23,0.07);
     gap: 4px;

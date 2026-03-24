@@ -184,11 +184,8 @@ const NgoDashboard: React.FC = () => {
   };
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  
+  
   const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
   const handleConfirmDelivery = (id: string) => {
@@ -306,7 +303,7 @@ const NgoDashboard: React.FC = () => {
   donations.forEach(d => { catCounts[d.category] = (catCounts[d.category]||0) + 1; });
   const doughnutData = {
     labels: Object.keys(catCounts),
-    datasets:[{ data: Object.values(catCounts), backgroundColor: Object.keys(catCounts).map(c => CATEGORY_COLORS[c]||'#94A3B8'), borderWidth:2, borderColor:'#fff' }],
+    datasets:[{ data: Object.values(catCounts), backgroundColor: Object.keys(catCounts).map(c => CATEGORY_COLORS[c]||'#94A3B8'), borderWidth:2, borderColor:'var(--card-bg)' }],
   };
   const doughnutOpts: any = {
     responsive:true, maintainAspectRatio:false,
@@ -391,7 +388,12 @@ const NgoDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }} aria-label="Toggle theme">
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
               <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
@@ -464,8 +466,8 @@ const NgoDashboard: React.FC = () => {
                   <div className="db-card-body" style={{ paddingTop:0 }}>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
                       {deliveries.filter(d => d.status !== 'confirmed').slice(0,3).map(d => (
-                        <div key={d.id} style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', borderRadius:'var(--r-sm)', padding:'10px 14px', boxShadow:'0 1px 6px rgba(0,0,0,0.07)', flex:'1 1 240px' }}>
-                          <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg,#2563EB,#3B82F6)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'0.8rem', fontWeight:700, flexShrink:0 }}>
+                        <div key={d.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--card-bg)', borderRadius:'var(--r-sm)', padding:'10px 14px', boxShadow:'0 1px 6px rgba(0,0,0,0.07)', flex:'1 1 240px' }}>
+                          <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg,#2563EB,#3B82F6)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--card-bg)', fontSize:'0.8rem', fontWeight:700, flexShrink:0 }}>
                             {d.volunteer.split(' ').map(n=>n[0]).join('')}
                           </div>
                           <div style={{ flex:1, minWidth:0 }}>
@@ -558,7 +560,7 @@ const NgoDashboard: React.FC = () => {
                         <div className="db-card-body" style={{ display:'flex', flexWrap:'wrap', gap:20, alignItems:'center' }}>
                           {/* Volunteer avatar */}
                           <div style={{ textAlign:'center', minWidth:60 }}>
-                            <div style={{ width:52, height:52, borderRadius:'50%', background:'linear-gradient(135deg,#2563EB,#3B82F6)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:'0.95rem', margin:'0 auto 6px' }}>
+                            <div style={{ width:52, height:52, borderRadius:'50%', background:'linear-gradient(135deg,#2563EB,#3B82F6)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--card-bg)', fontWeight:700, fontSize:'0.95rem', margin:'0 auto 6px' }}>
                               {delivery.volunteer.split(' ').map(n=>n[0]).join('')}
                             </div>
                             <div style={{ fontSize:'0.72rem', color:'var(--c-muted)', whiteSpace:'nowrap' }}>Volunteer</div>
@@ -888,7 +890,7 @@ const NgoDashboard: React.FC = () => {
       {/* ════ RATING MODAL ════ */}
       {ratingModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-          <div style={{ background:'#fff', borderRadius:'var(--r-xl)', padding:32, maxWidth:460, width:'100%', boxShadow:'var(--sh-lg)', animation:'fadeIn 0.2s ease' }}>
+          <div style={{ background:'var(--card-bg)', borderRadius:'var(--r-xl)', padding:32, maxWidth:460, width:'100%', boxShadow:'var(--sh-lg)', animation:'fadeIn 0.2s ease' }}>
             <div style={{ textAlign:'center', marginBottom:20 }}>
               <div style={{ fontSize:'3rem', marginBottom:8 }}>⭐</div>
               <h3 style={{ fontFamily:'var(--ff-head)', fontSize:'1.2rem', fontWeight:800 }}>Rate Volunteer</h3>
@@ -904,7 +906,7 @@ const NgoDashboard: React.FC = () => {
                     background:'none', border:'none', cursor:'pointer',
                     fontSize:'2.2rem', transition:'transform 0.15s',
                     transform: star <= ratingModal.stars ? 'scale(1.15)' : 'scale(1)',
-                    color: star <= ratingModal.stars ? '#F59E0B' : '#E2E8F0',
+                    color: star <= ratingModal.stars ? '#F59E0B' : 'var(--border-color)',
                   }}>
                   ★
                 </button>
@@ -939,7 +941,7 @@ const NgoDashboard: React.FC = () => {
       {/* ════ ASSIGN VOLUNTEER MODAL ════ */}
       {assignModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-          <div style={{ background:'#fff', borderRadius:'var(--r-xl)', padding:32, maxWidth:420, width:'100%', boxShadow:'var(--sh-lg)' }}>
+          <div style={{ background:'var(--card-bg)', borderRadius:'var(--r-xl)', padding:32, maxWidth:420, width:'100%', boxShadow:'var(--sh-lg)' }}>
             <h3 style={{ fontFamily:'var(--ff-head)', fontSize:'1.1rem', fontWeight:800, marginBottom:6 }}>
               <i className="fas fa-person-biking" style={{ color:'var(--c-accent)', marginRight:8 }}></i>Assign Volunteer
             </h3>
@@ -948,9 +950,9 @@ const NgoDashboard: React.FC = () => {
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
               {NGO_VOLUNTEERS.map(v => (
-                <label key={v} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:'var(--r-md)', border:`1.5px solid ${assignVolunteer===v?'var(--c-primary)':'var(--c-border)'}`, cursor:'pointer', background: assignVolunteer===v?'rgba(16,185,129,0.06)':'#fff', transition:'all 0.2s' }}>
+                <label key={v} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:'var(--r-md)', border:`1.5px solid ${assignVolunteer===v?'var(--c-primary)':'var(--c-border)'}`, cursor:'pointer', background: assignVolunteer===v?'rgba(16,185,129,0.06)':'var(--card-bg)', transition:'all 0.2s' }}>
                   <input type="radio" name="assignVol" value={v} checked={assignVolunteer===v} onChange={() => setAssignVolunteer(v)} style={{ accentColor:'var(--c-primary)' }} />
-                  <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10B981,#2563EB)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'0.75rem', fontWeight:700 }}>
+                  <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10B981,#2563EB)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--card-bg)', fontSize:'0.75rem', fontWeight:700 }}>
                     {v.split(' ').map((n:string)=>n[0]).join('')}
                   </div>
                   <span style={{ fontWeight:600, fontSize:'0.875rem' }}>{v}</span>

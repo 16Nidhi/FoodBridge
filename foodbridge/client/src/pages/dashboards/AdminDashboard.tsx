@@ -110,10 +110,7 @@ const AdminDashboard: React.FC = () => {
   };
   const handleLogout = () => { localStorage.removeItem('token'); dispatch(logout()); navigate('/login'); };
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+  
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -291,7 +288,7 @@ const AdminDashboard: React.FC = () => {
     datasets:[{
       data:[donors.length, volunteers.length, ngos.length, 1],
       backgroundColor:['var(--c-primary)','var(--c-accent)','var(--c-secondary)','var(--c-purple)'],
-      borderWidth:2, borderColor:'#fff',
+      borderWidth:2, borderColor:'var(--card-bg)',
     }],
   };
   const doughnutOpts: any = {
@@ -428,7 +425,12 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }} aria-label="Toggle theme">
                 {theme === 'light' ? '☀️' : '🌙'}
               </button>
             <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
@@ -549,7 +551,7 @@ const AdminDashboard: React.FC = () => {
                         <div style={{ fontSize:'0.82rem', color:'var(--c-muted)' }}>Review and approve/reject NGO applications</div>
                       </div>
                     </div>
-                    <button className="db-btn db-btn-sm" style={{ background:'var(--c-accent)', color:'#fff' }} onClick={() => setTab('ngos')}>
+                    <button className="db-btn db-btn-sm" style={{ background:'var(--c-accent)', color:'var(--card-bg)' }} onClick={() => setTab('ngos')}>
                       Review Now <i className="fas fa-arrow-right"></i>
                     </button>
                   </div>

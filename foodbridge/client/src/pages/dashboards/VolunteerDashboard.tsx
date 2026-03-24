@@ -143,11 +143,8 @@ const VolunteerDashboard: React.FC = () => {
   };
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  
+  
 
   const handleAccept = async (id: string) => {
     if (!isVerified) {
@@ -230,7 +227,7 @@ const VolunteerDashboard: React.FC = () => {
     datasets:[{
       data:[stats.available, stats.accepted, stats.inTransit, stats.completed],
       backgroundColor:['#F97316','#2563EB','#8B5CF6','#10B981'],
-      borderWidth:2, borderColor:'#fff',
+      borderWidth:2, borderColor:'var(--card-bg)',
     }],
   };
   const doughnutOpts: any = {
@@ -318,7 +315,12 @@ const VolunteerDashboard: React.FC = () => {
             </div>
           </div>
           <div className="db-topbar-right">
-              <button className="db-btn db-btn-ghost db-btn-sm" onClick={toggleTheme} aria-label="Toggle theme">
+              <button className="db-btn db-btn-ghost db-btn-sm" onClick={() => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }} aria-label="Toggle theme">
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
               <button className="db-btn db-btn-ghost db-btn-sm"><i className="fas fa-bell"></i></button>
@@ -710,7 +712,7 @@ const VolunteerDashboard: React.FC = () => {
                       <div style={{ display:'flex', gap:3, justifyContent:'center', marginTop:6 }}>
                         {[1,2,3,4,5].map(star => (
                           <i key={star} className="fas fa-star" style={{
-                            color: star <= Math.round(myRating.average) ? '#F59E0B' : '#E2E8F0',
+                            color: star <= Math.round(myRating.average) ? '#F59E0B' : 'var(--border-color)',
                             fontSize:'1.1rem',
                           }}></i>
                         ))}
