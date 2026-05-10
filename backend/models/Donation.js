@@ -104,7 +104,7 @@ const donationSchema = new mongoose.Schema(
         },
     },
     {
-        timestamps: true,
+        timestamps: true, // This adds createdAt and updatedAt fields
     }
 );
 

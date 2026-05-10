@@ -1,61 +1,61 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import { Donation } from '../../types';
+import * as api from '../../services/api';
 
-interface Listing {
-  id: string;
-  title: string;
-  description: string;
-  quantity: number;
-  location: string;
-  createdAt: string;
-}
+// Async Thunk for claiming a donation
+export const claimDonationThunk = createAsyncThunk(
+  'listings/claimDonation',
+  async (donationId: string, { rejectWithValue }) => {
+    try {
+      const response = await api.claimDonation(donationId);
+      return { donationId, data: response.data };
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to claim donation');
+    }
+  }
+);
 
 interface ListingState {
-  listings: Listing[];
+  listings: Donation[];
   loading: boolean;
   error: string | null;
+  optimisticUpdates: Record<string, Partial<Donation>>;
 }
 
 const initialState: ListingState = {
   listings: [],
   loading: false,
   error: null,
+  optimisticUpdates: {},
 };
 
 const listingSlice = createSlice({
   name: 'listings',
   initialState,
   reducers: {
-    fetchListingsStart(state) {
-      state.loading = true;
-      state.error = null;
+    optimisticClaim(state, action: PayloadAction<{ id: string; user: any }>) {
+      state.optimisticUpdates[action.payload.id] = {
+        status: 'claimed',
+        claimedBy: action.payload.user,
+      };
     },
-    fetchListingsSuccess(state, action: PayloadAction<Listing[]>) {
-      state.loading = false;
-      state.listings = action.payload;
-    },
-    fetchListingsFailure(state, action: PayloadAction<string>) {
-      state.loading = false;
-      state.error = action.payload;
-    },
-    addListing(state, action: PayloadAction<Listing>) {
-      state.listings.push(action.payload);
-    },
-    removeListing(state, action: PayloadAction<string>) {
-      state.listings = state.listings.filter(listing => listing.id !== action.payload);
-    },
-    claimFoodListing(state, action: PayloadAction<string>) {
-      // handled server-side; local state update is a no-op placeholder
-    },
+    clearOptimisticUpdate(state, action: PayloadAction<string>) {
+      delete state.optimisticUpdates[action.payload];
+    }
   },
+  extraReducers: (builder) => {
+    builder.addCase(claimDonationThunk.fulfilled, (state, action) => {
+      // Keep optimistic update or clear and rely on fetch
+    });
+    builder.addCase(claimDonationThunk.rejected, (state, action) => {
+      // Will be handled in component to revert optimistic state
+    });
+  }
 });
 
 export const {
-  fetchListingsStart,
-  fetchListingsSuccess,
-  fetchListingsFailure,
-  addListing,
-  removeListing,
-  claimFoodListing,
+  optimisticClaim,
+  clearOptimisticUpdate
 } = listingSlice.actions;
 
 export default listingSlice.reducer;

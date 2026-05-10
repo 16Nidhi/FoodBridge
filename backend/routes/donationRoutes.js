@@ -3,11 +3,12 @@ const router = express.Router();
 const {
     createDonation,
     getAllDonations,
+    getDonationById,
     getMyDonations,
-    acceptDonation,
-    volunteerAcceptDonation,
-    markPickedUp,
-    markDelivered,
+    claimDonation,
+    completeDonation,
+    updateDonation,
+    deleteDonation,
 } = require('../controllers/donationController');
 const { protect } = require('../middleware/authMiddleware');
 const { restrictTo } = require('../middleware/roleMiddleware');
@@ -15,26 +16,20 @@ const { restrictTo } = require('../middleware/roleMiddleware');
 // All routes below require the user to be logged in
 router.use(protect);
 
-// POST /api/donations — Donor creates a new donation
-router.post('/', restrictTo('donor'), createDonation);
+router
+    .route('/')
+    .post(restrictTo('donor'), createDonation)
+    .get(getAllDonations);
 
-// GET /api/donations — View available donations (NGOs see all, volunteers see open ones)
-router.get('/', restrictTo('ngo', 'volunteer', 'admin'), getAllDonations);
+router.get('/my', getMyDonations);
 
-// GET /api/donations/my-donations — Donor views their own posted donations
-// NOTE: This must be declared BEFORE /:id routes to avoid conflicts
-router.get('/my-donations', restrictTo('donor'), getMyDonations);
+router
+    .route('/:id')
+    .get(getDonationById)
+    .put(restrictTo('donor'), updateDonation)
+    .delete(restrictTo('donor'), deleteDonation);
 
-// PATCH /api/donations/accept — NGO accepts a donation (body: { donationId, volunteerId? })
-router.patch('/accept', restrictTo('ngo'), acceptDonation);
-
-// PATCH /api/donations/volunteer-accept — Volunteer self-accepts an open pickup
-router.patch('/volunteer-accept', restrictTo('volunteer'), volunteerAcceptDonation);
-
-// PATCH /api/donations/picked-up — Volunteer marks food as collected (body: { donationId })
-router.patch('/picked-up', restrictTo('volunteer'), markPickedUp);
-
-// PATCH /api/donations/delivered — NGO confirms the food was delivered (body: { donationId })
-router.patch('/delivered', restrictTo('ngo'), markDelivered);
+router.patch('/:id/claim', restrictTo('ngo', 'volunteer'), claimDonation);
+router.patch('/:id/complete', restrictTo('ngo', 'volunteer'), completeDonation);
 
 module.exports = router;

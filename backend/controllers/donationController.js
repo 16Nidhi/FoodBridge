@@ -1,4 +1,5 @@
 const Donation = require('../models/Donation');
+const { createNotification } = require('../utils/helpers');
 
 /**
  * NGO Priority Window:
@@ -36,25 +37,22 @@ const openExpiredDonationsToVolunteers = async () => {
 // ----------------------------
 
 const createDonation = async (req, res) => {
-    const { foodType, quantity, location, preparedTime, description, category } = req.body;
+    const { foodItem, quantity, pickupLocation, pickupTime } = req.body;
 
-    if (!foodType || !quantity || !location || !preparedTime) {
+    if (!foodItem || !quantity || !pickupLocation || !pickupTime) {
         return res.status(400).json({
             success: false,
-            message: 'Please provide foodType, quantity, location, and preparedTime.',
+            message: 'Please provide all required fields for the donation.',
         });
     }
 
     try {
-        // donorId is taken from the authenticated user (not from request body)
         const donation = await Donation.create({
-            foodType,
+            foodItem,
             quantity,
-            location,
-            preparedTime: new Date(preparedTime),
-            donorId: req.user._id,
-            description: description || '',
-            category: category || 'Other',
+            pickupLocation,
+            pickupTime: new Date(pickupTime),
+            donor: req.user._id,
         });
 
         res.status(201).json({
@@ -76,24 +74,32 @@ const createDonation = async (req, res) => {
 
 const getAllDonations = async (req, res) => {
     try {
-        // Before sending data, update any donations whose NGO window has expired
-        await openExpiredDonationsToVolunteers();
-
+        const { search, foodType, location } = req.query;
         let filter = {};
 
-        if (req.user.role === 'ngo') {
-            // NGOs see all posted donations (priority access)
-            filter = { status: 'posted' };
-        } else if (req.user.role === 'volunteer') {
-            // Volunteers only see donations that NGOs didn't accept in time
-            filter = { status: 'posted', openToVolunteers: true };
+        // Admins see all donations, others see only pending
+        if (req.user.role !== 'admin') {
+            filter.status = 'pending';
         }
-        // Admin has no filter → sees everything
+
+        if (search) {
+            filter.$or = [
+                { foodItem: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } },
+            ];
+        }
+
+        if (foodType) {
+            filter.foodType = foodType;
+        }
+
+        if (location) {
+            filter.pickupLocation = { $regex: location, $options: 'i' };
+        }
 
         const donations = await Donation.find(filter)
-            .populate('donorId', 'name email phone')
-            .populate('assignedVolunteer', 'name email phone rating')
-            .populate('assignedNGO', 'name email phone')
+            .populate('donor', 'name email')
+            .populate('claimedBy', 'name email')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ success: true, count: donations.length, donations });
@@ -104,16 +110,44 @@ const getAllDonations = async (req, res) => {
 };
 
 // ----------------------------
-// @desc   Get the logged-in donor's own donations
-// @route  GET /api/donations/my-donations
-// @access Private — Donor only
+// @desc   Get a single donation by ID
+// @route  GET /api/donations/:id
+// @access Private
 // ----------------------------
+const getDonationById = async (req, res) => {
+    try {
+        const donation = await Donation.findById(req.params.id)
+            .populate('donor', 'name email')
+            .populate('claimedBy', 'name email');
 
+        if (!donation) {
+            return res.status(404).json({ success: false, message: 'Donation not found.' });
+        }
+
+        res.status(200).json({ success: true, donation });
+    } catch (error) {
+        console.error('Get donation by ID error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ----------------------------
+// @desc   Get donations for the logged-in user (donor, NGO, volunteer)
+// @route  GET /api/donations/my
+// @access Private
+// ----------------------------
 const getMyDonations = async (req, res) => {
     try {
-        const donations = await Donation.find({ donorId: req.user._id })
-            .populate('assignedVolunteer', 'name email phone rating')
-            .populate('assignedNGO', 'name email phone')
+        let filter = {};
+        if (req.user.role === 'donor') {
+            filter.donor = req.user._id;
+        } else { // For NGO and Volunteer
+            filter.claimedBy = req.user._id;
+        }
+
+        const donations = await Donation.find(filter)
+            .populate('donor', 'name email')
+            .populate('claimedBy', 'name email')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ success: true, count: donations.length, donations });
@@ -124,226 +158,168 @@ const getMyDonations = async (req, res) => {
 };
 
 // ----------------------------
-// @desc   NGO accepts a donation and optionally assigns a volunteer
-// @route  PATCH /api/donations/accept
-// @access Private — NGO only
+// @desc   Claim a donation
+// @route  PATCH /api/donations/:id/claim
+// @access Private - NGO, Volunteer
 // ----------------------------
-
-const acceptDonation = async (req, res) => {
-    const { donationId, volunteerId } = req.body;
-
-    if (!donationId) {
-        return res.status(400).json({ success: false, message: 'Donation ID is required.' });
-    }
-
+const claimDonation = async (req, res) => {
     try {
-        const donation = await Donation.findById(donationId);
+        const donation = await Donation.findById(req.params.id);
 
         if (!donation) {
             return res.status(404).json({ success: false, message: 'Donation not found.' });
         }
 
-        // Only allow accepting donations that are still in "posted" state
-        if (donation.status !== 'posted') {
+        if (donation.status !== 'pending') {
             return res.status(400).json({
                 success: false,
-                message: 'This donation is no longer available for acceptance.',
+                message: 'This donation is no longer available.',
             });
         }
 
-        // Assign this NGO and move to accepted status
-        donation.assignedNGO = req.user._id;
-        donation.status = 'accepted';
-        donation.ngoAcceptedAt = new Date();
-
-        // NGO can optionally assign a specific volunteer from their roster
-        if (volunteerId) {
-            donation.assignedVolunteer = volunteerId;
-        }
-
+        donation.status = 'claimed';
+        donation.claimedBy = req.user._id;
         await donation.save();
+
+        // Notify the donor
+        await createNotification({
+            recipient: donation.donor,
+            sender: req.user._id,
+            type: 'donation_claimed',
+            message: `${req.user.name} has claimed your donation of "${donation.foodItem}".`,
+            link: `/donations/${donation._id}`,
+        });
 
         res.status(200).json({
             success: true,
-            message: 'Donation accepted successfully.',
+            message: 'Donation claimed successfully.',
             donation,
         });
     } catch (error) {
-        console.error('Accept donation error:', error);
-        res.status(500).json({ success: false, message: 'Server error while accepting donation.' });
+        console.error('Claim donation error:', error);
+        res.status(500).json({ success: false, message: 'Server error while claiming donation.' });
     }
 };
 
 // ----------------------------
-// @desc   Volunteer marks a donation as picked up
-// @route  PATCH /api/donations/picked-up
-// @access Private — Volunteer only
+// @desc   Mark a donation as completed
+// @route  PATCH /api/donations/:id/complete
+// @access Private - NGO, Volunteer
 // ----------------------------
-
-const markPickedUp = async (req, res) => {
-    const { donationId } = req.body;
-
-    if (!donationId) {
-        return res.status(400).json({ success: false, message: 'Donation ID is required.' });
-    }
-
+const completeDonation = async (req, res) => {
     try {
-        const donation = await Donation.findById(donationId);
+        const donation = await Donation.findById(req.params.id);
 
         if (!donation) {
             return res.status(404).json({ success: false, message: 'Donation not found.' });
         }
 
-        // Donation must be in "accepted" state before it can be picked up
-        if (donation.status !== 'accepted') {
+        if (donation.status !== 'claimed') {
             return res.status(400).json({
                 success: false,
-                message: 'Donation must be accepted before it can be marked as picked up.',
+                message: 'Donation must be claimed first.',
             });
         }
 
-        // Check if this volunteer is assigned or if pickup is open (no prior assignment)
-        const isAssignedVolunteer =
-            donation.assignedVolunteer &&
-            donation.assignedVolunteer.toString() === req.user._id.toString();
-
-        const isOpenPickup = !donation.assignedVolunteer && donation.openToVolunteers;
-
-        if (!isAssignedVolunteer && !isOpenPickup) {
+        if (donation.claimedBy.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
-                message: 'You are not assigned to this donation.',
+                message: 'You are not authorized to complete this donation.',
             });
         }
 
-        // If this is an open pickup, assign the volunteer now
-        if (isOpenPickup) {
-            donation.assignedVolunteer = req.user._id;
-        }
-
-        donation.status = 'picked_up';
+        donation.status = 'completed';
         await donation.save();
+
+        // Notify the donor
+        await createNotification({
+            recipient: donation.donor,
+            sender: req.user._id,
+            type: 'donation_completed',
+            message: `Your donation of "${donation.foodItem}" has been successfully delivered.`,
+            link: `/donations/${donation._id}`,
+        });
 
         res.status(200).json({
             success: true,
-            message: 'Donation marked as picked up.',
+            message: 'Donation marked as completed.',
             donation,
         });
     } catch (error) {
-        console.error('Mark picked up error:', error);
-        res.status(500).json({ success: false, message: 'Server error while updating donation.' });
+        console.error('Complete donation error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
 
 // ----------------------------
-// @desc   NGO confirms delivery of a donation
-// @route  PATCH /api/donations/delivered
-// @access Private — NGO only
+// @desc   Update a donation
+// @route  PUT /api/donations/:id
+// @access Private - Donor only
 // ----------------------------
-
-const markDelivered = async (req, res) => {
-    const { donationId } = req.body;
-
-    if (!donationId) {
-        return res.status(400).json({ success: false, message: 'Donation ID is required.' });
-    }
-
+const updateDonation = async (req, res) => {
     try {
-        const donation = await Donation.findById(donationId);
+        let donation = await Donation.findById(req.params.id);
 
         if (!donation) {
             return res.status(404).json({ success: false, message: 'Donation not found.' });
         }
 
-        // Can only mark as delivered if it has been picked up first
-        if (donation.status !== 'picked_up') {
-            return res.status(400).json({
-                success: false,
-                message: 'Donation must be picked up before it can be marked as delivered.',
-            });
-        }
-
-        // Only the NGO that accepted this donation can confirm delivery
-        if (donation.assignedNGO.toString() !== req.user._id.toString()) {
+        if (donation.donor.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
-                message: 'Only the assigned NGO can confirm delivery of this donation.',
+                message: 'You can only update your own donations.',
             });
         }
 
-        donation.status = 'delivered';
-        await donation.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Donation marked as delivered successfully.',
-            donation,
+        donation = await Donation.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true,
         });
+
+        res.status(200).json({ success: true, donation });
     } catch (error) {
-        console.error('Mark delivered error:', error);
-        res.status(500).json({ success: false, message: 'Server error while confirming delivery.' });
+        console.error('Update donation error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
 
 // ----------------------------
-// @desc   Volunteer self-accepts an open pickup (before physical pickup)
-// @route  PATCH /api/donations/volunteer-accept
-// @access Private — Volunteer only
+// @desc   Delete a donation
+// @route  DELETE /api/donations/:id
+// @access Private - Donor only
 // ----------------------------
-
-const volunteerAcceptDonation = async (req, res) => {
-    const { donationId } = req.body;
-
-    if (!donationId) {
-        return res.status(400).json({ success: false, message: 'Donation ID is required.' });
-    }
-
+const deleteDonation = async (req, res) => {
     try {
-        const donation = await Donation.findById(donationId);
+        const donation = await Donation.findById(req.params.id);
 
         if (!donation) {
             return res.status(404).json({ success: false, message: 'Donation not found.' });
         }
 
-        // Must be visible to volunteers and not already accepted by another volunteer
-        if (!donation.openToVolunteers && donation.status !== 'accepted') {
-            return res.status(400).json({
+        if (donation.donor.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
                 success: false,
-                message: 'This donation is not yet available for volunteer pickup.',
+                message: 'You can only delete your own donations.',
             });
         }
 
-        if (donation.assignedVolunteer) {
-            return res.status(400).json({
-                success: false,
-                message: 'This pickup has already been accepted by another volunteer.',
-            });
-        }
+        await donation.remove();
 
-        donation.assignedVolunteer = req.user._id;
-        // Keep status as 'posted' → 'accepted' to mark volunteer assignment
-        if (donation.status === 'posted') {
-            donation.status = 'accepted';
-        }
-        await donation.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Pickup accepted! Head to the donor location.',
-            donation,
-        });
+        res.status(200).json({ success: true, message: 'Donation removed.' });
     } catch (error) {
-        console.error('Volunteer accept error:', error);
-        res.status(500).json({ success: false, message: 'Server error while accepting pickup.' });
+        console.error('Delete donation error:', error);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
+
 
 module.exports = {
     createDonation,
     getAllDonations,
+    getDonationById,
     getMyDonations,
-    acceptDonation,
-    volunteerAcceptDonation,
-    markPickedUp,
-    markDelivered,
+    claimDonation,
+    completeDonation,
+    updateDonation,
+    deleteDonation,
 };

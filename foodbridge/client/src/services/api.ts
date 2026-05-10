@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { FoodListing } from '../types';
+import { Donation } from '../types';
 
 const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000';
 
@@ -24,62 +24,47 @@ export const authRegister = (data: Record<string, string>) =>
 
 export const getMe = () => api.get('auth/me');
 
-// ─── Donations (Donor) ───────────────────────────────────────
+export const updateUserProfile = (data: { name?: string; location?: string }) =>
+  api.patch('auth/me', data);
+
+// ─── Donations ───────────────────────────────────────
 export const createDonation = (data: {
-  foodType: string; quantity: string; location: string; preparedTime: string;
+  foodItem: string;
+  quantity: string;
+  pickupLocation: string;
+  pickupTime: string;
 }) => api.post('donations', data);
 
-export const getMyDonations = () => api.get('donations/my-donations');
-
-// ─── Donations (NGO / Volunteer / Admin) ─────────────────────
-export const getAllDonations = () => api.get('donations');
-
-const mapDonationToFoodListing = (donation: any): FoodListing => ({
-  id: donation._id || donation.id || '',
-  donorId: donation.donorId?._id || donation.donorId || '',
-  description: donation.description || donation.foodType || 'Food Listing',
-  quantity: Number.parseFloat(String(donation.quantity)) || 0,
-  pickupLocation: donation.location || donation.pickupLocation || '',
-  expiryDate: donation.expiryTime
-    ? new Date(donation.expiryTime)
-    : donation.createdAt
-      ? new Date(donation.createdAt)
-      : new Date(),
-});
-
-export const fetchFoodListings = async (): Promise<FoodListing[]> => {
-  const res = await getAllDonations();
-  const donations = Array.isArray(res.data?.donations)
-    ? res.data.donations
-    : Array.isArray(res.data)
-      ? res.data
-      : [];
-
-  return donations.map(mapDonationToFoodListing);
+export const getAllDonations = async (params: { search?: string; foodType?: string; location?: string } = {}): Promise<Donation[]> => {
+  const res = await api.get('donations', { params });
+  return res.data.donations;
 };
 
-/** NGO accepts a donation and optionally assigns a volunteer */
-export const acceptDonation = (donationId: string, volunteerId?: string) =>
-  api.patch('donations/accept', { donationId, ...(volunteerId ? { volunteerId } : {}) });
+export const getMyDonations = async (): Promise<Donation[]> => {
+  const res = await api.get('donations/my');
+  return res.data.donations;
+};
 
-/** Volunteer self-accepts an open pickup */
-export const volunteerAcceptPickup = (donationId: string) =>
-  api.patch('donations/volunteer-accept', { donationId });
+export const getDonationById = async (id: string): Promise<Donation> => {
+  const res = await api.get(`donations/${id}`);
+  return res.data.donation;
+};
 
-/** Volunteer marks food as picked up from donor */
-export const markPickedUp = (donationId: string) =>
-  api.patch('donations/picked-up', { donationId });
+export const claimDonation = (id: string) => api.patch(`donations/${id}/claim`);
 
-/** NGO confirms food was delivered */
-export const markDelivered = (donationId: string) =>
-  api.patch('donations/delivered', { donationId });
+export const completeDonation = (id: string) => api.patch(`donations/${id}/complete`);
+
+export const updateDonation = (id: string, data: Partial<Donation>) => api.put(`donations/${id}`, data);
+
+export const deleteDonation = (id: string) => api.delete(`donations/${id}`);
+
 
 // ─── Ratings ─────────────────────────────────────────────────
-export const addRating = (volunteerId: string, rating: number, review?: string) =>
-  api.post('ratings', { volunteerId, rating, review });
+export const addRating = (data: { ratedUserId: string; donationId: string; rating: number; review?: string }) =>
+  api.post('ratings', data);
 
-export const getVolunteerRatings = (volunteerId: string) =>
-  api.get(`ratings/${volunteerId}`);
+export const getUserRatings = (userId: string) =>
+  api.get(`ratings/${userId}`);
 
 // ─── Admin ───────────────────────────────────────────────────
 export const adminGetUsers = (role?: string) =>
@@ -99,11 +84,19 @@ export const adminReviewVerification = (id: string, status: 'approved' | 'reject
 export const adminUpdateUserStatus = (id: string, status: 'active' | 'suspended') =>
   api.patch(`admin/users/${id}/status`, { status });
 
+
 export const adminUpdateUserVerification = (id: string, verificationStatus: 'approved' | 'rejected') =>
   api.patch(`admin/users/${id}/verify`, { verificationStatus });
 
 // ─── Verifications (Volunteer) ────────────────────────────────
 export const submitVerification = (idDocument: string) =>
   api.post('verifications', { idDocument });
+
+// ─── Notifications ──────────────────────────────────────────
+export const getMyNotifications = () => api.get('notifications');
+
+export const markNotificationAsRead = (id: string) => api.patch(`notifications/${id}/read`);
+
+export const markAllNotificationsAsRead = () => api.patch('notifications/read-all');
 
 export default api;
