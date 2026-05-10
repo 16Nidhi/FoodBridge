@@ -1,5 +1,6 @@
 const Verification = require('../models/Verification');
 const User = require('../models/User');
+const { createNotification } = require('../utils/helpers');
 
 // ----------------------------
 // @desc   Volunteer submits a verification request
@@ -100,6 +101,15 @@ const reviewVerification = async (req, res) => {
         // Mirror the decision on the volunteer's User document
         await User.findByIdAndUpdate(verification.volunteerId, {
             verificationStatus: status,
+        });
+
+        // Notify the volunteer
+        await createNotification({
+            recipient: verification.volunteerId,
+            sender: req.user._id,
+            type: status === 'approved' ? 'verification_approved' : 'verification_rejected',
+            message: `Your verification request has been ${status}.`,
+            link: '/profile',
         });
 
         res.status(200).json({

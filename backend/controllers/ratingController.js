@@ -1,23 +1,23 @@
 const Rating = require('../models/Rating');
 const User = require('../models/User');
+const Donation = require('../models/Donation');
+const { createNotification } = require('../utils/helpers');
 
 // ----------------------------
-// @desc   NGO submits a rating for a volunteer
+// @desc   Submit a rating for a user involved in a donation
 // @route  POST /api/ratings
-// @access Private — NGO only
+// @access Private
 // ----------------------------
-
 const addRating = async (req, res) => {
-    const { volunteerId, rating, review } = req.body;
+    const { ratedUserId, donationId, rating, review } = req.body;
 
-    if (!volunteerId || !rating) {
+    if (!ratedUserId || !donationId || !rating) {
         return res.status(400).json({
             success: false,
-            message: 'volunteerId and rating are required.',
+            message: 'ratedUserId, donationId, and rating are required.',
         });
     }
 
-    // Validate rating range before hitting the database
     if (rating < 1 || rating > 5) {
         return res.status(400).json({
             success: false,
@@ -26,34 +26,63 @@ const addRating = async (req, res) => {
     }
 
     try {
-        // Confirm the target user exists and is actually a volunteer
-        const volunteer = await User.findById(volunteerId);
-
-        if (!volunteer || volunteer.role !== 'volunteer') {
-            return res.status(404).json({ success: false, message: 'Volunteer not found.' });
+        const donation = await Donation.findById(donationId);
+        if (!donation) {
+            return res.status(404).json({ success: false, message: 'Donation not found.' });
         }
 
-        // Save the new rating
+        // Logic to ensure the rater was part of the transaction
+        const raterId = req.user._id.toString();
+        const donorId = donation.donor.toString();
+        const claimedById = donation.claimedBy ? donation.claimedBy.toString() : null;
+
+        const isRaterDonor = raterId === donorId;
+        const isRaterClaimer = raterId === claimedById;
+
+        if (!isRaterDonor && !isRaterClaimer) {
+            return res.status(403).json({ success: false, message: 'You were not part of this transaction.' });
+        }
+        
+        // Prevent rating yourself
+        if (ratedUserId === raterId) {
+            return res.status(400).json({ success: false, message: 'You cannot rate yourself.' });
+        }
+
+        // Ensure the rated user was the other party in the transaction
+        if ((isRaterDonor && ratedUserId !== claimedById) || (isRaterClaimer && ratedUserId !== donorId)) {
+             return res.status(403).json({ success: false, message: 'You can only rate the other party in the transaction.' });
+        }
+
+        // Prevent double-rating for the same donation
+        const existingRating = await Rating.findOne({ donationId, ratedBy: raterId });
+        if (existingRating) {
+            return res.status(400).json({ success: false, message: 'You have already rated this transaction.' });
+        }
+
         const newRating = await Rating.create({
-            volunteerId,
-            ngoId: req.user._id,
+            ratedUser: ratedUserId,
+            ratedBy: raterId,
+            donationId,
             rating,
             review,
         });
 
-        // ----------------------------
-        // Recalculate the volunteer's average rating
-        // ----------------------------
-
-        // Fetch ALL ratings for this volunteer to calculate the true average
-        const allRatings = await Rating.find({ volunteerId });
+        // Recalculate the user's average rating
+        const allRatings = await Rating.find({ ratedUser: ratedUserId });
         const totalSum = allRatings.reduce((sum, r) => sum + r.rating, 0);
         const averageRating = totalSum / allRatings.length;
 
-        // Update the volunteer's average rating and increment their delivery count
-        await User.findByIdAndUpdate(volunteerId, {
+        await User.findByIdAndUpdate(ratedUserId, {
             rating: parseFloat(averageRating.toFixed(2)),
-            $inc: { deliveriesCompleted: 1 },
+        });
+
+        // Notify the user who was rated
+        await createNotification({
+            recipient: ratedUserId,
+            sender: raterId,
+            type: 'new_rating',
+            message: `${req.user.name} gave you a ${rating}-star rating.`,
+            link: `/profile/${ratedUserId}`, // Link to the user's profile
         });
 
         res.status(201).json({
@@ -68,38 +97,35 @@ const addRating = async (req, res) => {
 };
 
 // ----------------------------
-// @desc   Get all ratings for a specific volunteer
-// @route  GET /api/ratings/:volunteerId
+// @desc   Get all ratings for a specific user
+// @route  GET /api/ratings/:userId
 // @access Private
 // ----------------------------
-
-const getVolunteerRatings = async (req, res) => {
+const getUserRatings = async (req, res) => {
     try {
-        const { volunteerId } = req.params;
+        const { userId } = req.params;
 
-        // Get all ratings for this volunteer, with NGO names populated
-        const ratings = await Rating.find({ volunteerId })
-            .populate('ngoId', 'name email')
+        const ratings = await Rating.find({ ratedUser: userId })
+            .populate('ratedBy', 'name email role')
+            .populate('donationId', 'foodItem')
             .sort({ createdAt: -1 });
 
-        // Include volunteer summary stats alongside the ratings list
-        const volunteer = await User.findById(volunteerId)
-            .select('name rating deliveriesCompleted verificationStatus');
+        const user = await User.findById(userId).select('name rating role');
 
-        if (!volunteer) {
-            return res.status(404).json({ success: false, message: 'Volunteer not found.' });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         res.status(200).json({
             success: true,
-            volunteer,
+            user,
             count: ratings.length,
             ratings,
         });
     } catch (error) {
-        console.error('Get volunteer ratings error:', error);
+        console.error('Get user ratings error:', error);
         res.status(500).json({ success: false, message: 'Server error while fetching ratings.' });
     }
 };
 
-module.exports = { addRating, getVolunteerRatings };
+module.exports = { addRating, getUserRatings };

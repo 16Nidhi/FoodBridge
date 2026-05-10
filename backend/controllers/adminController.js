@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Donation = require('../models/Donation');
 const Verification = require('../models/Verification');
+const { createNotification } = require('../utils/helpers');
 
 // ----------------------------
 // @desc   Get all users (with optional role filter)
@@ -116,7 +117,7 @@ const updateUserStatus = async (req, res) => {
     try {
         const user = await User.findByIdAndUpdate(
             id,
-            { $set: { isActive: status === 'active' } },
+            { $set: { status: status } },
             { new: true, select: '-password' }
         );
 
@@ -154,6 +155,15 @@ const updateUserVerification = async (req, res) => {
         );
 
         if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+        // Notify the NGO
+        await createNotification({
+            recipient: user._id,
+            sender: req.user._id,
+            type: verificationStatus === 'approved' ? 'verification_approved' : 'verification_rejected',
+            message: `Your NGO verification status has been updated to ${verificationStatus}.`,
+            link: '/profile',
+        });
 
         res.status(200).json({
             success: true,

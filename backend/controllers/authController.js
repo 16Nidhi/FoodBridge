@@ -140,4 +140,39 @@ const getMe = async (req, res) => {
     }
 };
 
-module.exports = { register, login, getMe };
+// ----------------------------
+// @desc   Update user's own profile
+// @route  PATCH /api/auth/me
+// @access Private
+// ----------------------------
+
+const updateUserProfile = async (req, res) => {
+    const { name, location } = req.body;
+
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        user.name = name || user.name;
+        user.location = location || user.location;
+
+        await user.save();
+
+        // Return the updated user, excluding the password
+        const updatedUser = await User.findById(req.user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully.',
+            user: updatedUser,
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ success: false, message: 'Server error while updating profile.' });
+    }
+};
+
+module.exports = { register, login, getMe, updateUserProfile };

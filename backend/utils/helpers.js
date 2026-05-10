@@ -54,9 +54,30 @@ const errorResponse = (message) => ({
     message,
 });
 
+/**
+ * Create and save a new notification.
+ *
+ * @param {object} details - Notification details
+ * @param {string} details.recipient - The user ID of the person to notify
+ * @param {string} [details.sender] - The user ID of the person who triggered the event
+ * @param {'donation_claimed'|'donation_completed'|'new_rating'|'verification_approved'|'verification_rejected'} details.type - The type of notification
+ * @param {string} details.message - The notification message
+ * @param {string} [details.link] - A URL link related to the notification
+ */
+const createNotification = async (details) => {
+    try {
+        await Notification.create(details);
+    } catch (error) {
+        console.error('Failed to create notification:', error);
+        // We don't throw an error here because a failed notification
+        // should not block the primary action (e.g., claiming a donation).
+    }
+};
+
 module.exports = {
     calculateExpiryTime,
     isNGOWindowExpired,
     successResponse,
     errorResponse,
+    createNotification,
 };

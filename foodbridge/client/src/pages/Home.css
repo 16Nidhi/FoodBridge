@@ -1,5 +1,5 @@
 /* =====================================================================
-   Home.css  —  FoodBridge Premium UI
+   Home.css  ï¿½  FoodBridge Premium UI
    ===================================================================== */
 
 /* --- Global smooth scroll ------------------------------------------- */
@@ -56,9 +56,8 @@ html { scroll-behavior: smooth; }
   min-height: 100vh;
   display: flex;
   align-items: center;
-  background: linear-gradient(120deg, #ecfdf5, #eff6ff, #fef3c7, #fdf4ff);
-  background-size: 300% 300%;
-  animation: heroBgShift 15s ease-in-out infinite;
+  padding: 120px 0;
+  background: var(--c-gradient-bg);
   overflow: hidden;
 }
 
@@ -99,42 +98,18 @@ html { scroll-behavior: smooth; }
 
 .home-hero__inner {
   position: relative;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 60px;
-  align-items: center;
-  padding-top: 120px;
-  padding-bottom: 90px;
+  z-index: 2;
+  text-align: center;
 }
 
-.hero-content { display: flex; flex-direction: column; gap: 28px; }
-
-.hero-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--card-bg);
-  border: 1px solid rgba(16,185,129,0.3);
-  color: #065F46;
-  padding: 8px 22px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  font-family: "Poppins", sans-serif;
-  width: fit-content;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 16px rgba(16,185,129,0.1);
-  animation: pillPulse 3s ease-in-out infinite;
-}
-@keyframes pillPulse {
-  0%,100% { box-shadow: 0 4px 16px rgba(16,185,129,0.1); transform: scale(1); }
-  50%      { box-shadow: 0 4px 24px rgba(16,185,129,0.25); transform: scale(1.02); }
+.hero-content {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .hero-title {
   font-family: "Poppins", sans-serif;
-  font-size: clamp(2.6rem, 5vw, 4.2rem);
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.1;
@@ -143,13 +118,42 @@ html { scroll-behavior: smooth; }
 }
 
 .hero-desc {
-  font-size: 1.15rem;
-  color: rgba(255,255,255,0.85);
-  line-height: 1.8;
-  max-width: 540px;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  max-width: 600px;
+  margin: 1.5rem auto 2.5rem;
 }
 
-.hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .home-hero {
+    padding: 80px 0;
+    text-align: center;
+  }
+  .hero-title {
+    font-size: 2.5rem;
+  }
+  .hero-desc {
+    font-size: 1rem;
+  }
+  .home-hero__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .hero-content {
+    gap: 20px;
+  }
+  .hero-pill {
+    margin: 0 auto;
+  }
+}
+
+.hero-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
 
 /* Button base */
 .hbtn {
@@ -194,7 +198,7 @@ html { scroll-behavior: smooth; }
 }
 .hbtn-secondary:hover { background: var(--bg-primary); box-shadow: 0 10px 24px rgba(0,0,0,0.08); border-color: var(--border-color); }
 
-.hbtn-var(--bg-secondary) {
+.hbtn-muted {
   background: var(--bg-primary);
   color: var(--accent);
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);

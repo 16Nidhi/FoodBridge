@@ -30,6 +30,7 @@ app.use('/api/auth',          require('./routes/authRoutes'));
 app.use('/api/donations',     require('./routes/donationRoutes'));
 app.use('/api/verifications', require('./routes/verificationRoutes'));
 app.use('/api/ratings',       require('./routes/ratingRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/admin',         require('./routes/adminRoutes'));
 
 // Health-check endpoint

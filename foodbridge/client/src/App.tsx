@@ -32,7 +32,7 @@ const App: React.FC = () => {
         if (!mounted || !me) return;
 
         dispatch(setUser({
-          id: me._id,
+          _id: me._id,
           name: me.name,
           role: me.role,
           verificationStatus: me.verificationStatus,
@@ -62,7 +62,9 @@ const App: React.FC = () => {
     <Router>
       <div className="app">
         <Navbar />
-        <AppRoutes />
+        <main>
+          <AppRoutes />
+        </main>
         <Footer />
       </div>
     </Router>

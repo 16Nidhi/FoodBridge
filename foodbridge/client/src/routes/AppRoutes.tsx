@@ -11,6 +11,7 @@ import DonorDashboard     from '../pages/dashboards/DonorDashboard';
 import VolunteerDashboard from '../pages/dashboards/VolunteerDashboard';
 import NgoDashboard       from '../pages/dashboards/NgoDashboard';
 import AdminDashboard     from '../pages/dashboards/AdminDashboard';
+import Profile from '../pages/Profile';
 
 /* Redirects /dashboard → /<role>-dashboard based on logged-in user */
 const DashboardRouter: React.FC = () => {
@@ -38,6 +39,7 @@ const AppRoutes = () => {
       
       {/* Protected & Role-Based Routes */}
       <Route element={<ProtectedRoute />}>
+        <Route path="/profile" element={<Profile />} />
         {/* Donor */}
         <Route element={<RoleBasedRoute allowedRoles={['donor']} />}>
           <Route path="/donor-dashboard" element={<DonorDashboard />} />

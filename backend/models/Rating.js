@@ -1,25 +1,25 @@
 const mongoose = require('mongoose');
 
-/**
- * Rating Schema
- *
- * An NGO submits a rating for a volunteer after a successful delivery.
- * Adding a rating also triggers an update to the volunteer's
- * average rating and deliveriesCompleted count in the User collection.
- */
 const ratingSchema = new mongoose.Schema(
     {
-        // The volunteer being rated
-        volunteerId: {
+        // The user being rated
+        ratedUser: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true,
         },
 
-        // The NGO giving the rating
-        ngoId: {
+        // The user giving the rating
+        ratedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
+            required: true,
+        },
+
+        // The donation this rating is associated with
+        donationId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Donation',
             required: true,
         },
 

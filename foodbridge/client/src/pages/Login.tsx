@@ -6,11 +6,11 @@ import './Login.css';
 import api from '../services/api';
 
 // Demo role credentials so reviewers can jump straight to each dashboard
-const DEMO_CREDENTIALS: Record<string, { id: string; name: string; role: string }> = {
-  'donor@demo.com':     { id: '1', name: 'Arjun Sharma',  role: 'donor' },
-  'volunteer@demo.com': { id: '2', name: 'Priya Patel',   role: 'volunteer' },
-  'ngo@demo.com':       { id: '3', name: 'Help Foundation', role: 'ngo' },
-  'admin@demo.com':     { id: '4', name: 'Site Admin',    role: 'admin' },
+const DEMO_CREDENTIALS: Record<string, { _id: string; name: string; role: string }> = {
+  'donor@demo.com':     { _id: '1', name: 'Arjun Sharma',  role: 'donor' },
+  'volunteer@demo.com': { _id: '2', name: 'Priya Patel',   role: 'volunteer' },
+  'ngo@demo.com':       { _id: '3', name: 'Help Foundation', role: 'ngo' },
+  'admin@demo.com':     { _id: '4', name: 'Site Admin',    role: 'admin' },
 };
 
 const Login: React.FC = () => {
@@ -28,7 +28,7 @@ const Login: React.FC = () => {
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       dispatch(login({
-        id: user._id,
+        _id: user._id,
         name: user.name,
         role: user.role,
         verificationStatus: user.verificationStatus,
@@ -41,7 +41,12 @@ const Login: React.FC = () => {
       // Fallback to demo credentials for quick previews
       const match = DEMO_CREDENTIALS[email.toLowerCase()];
       if (match) {
-        dispatch(login(match));
+        // match already has `_id`, `name`, and `role`
+        dispatch(login({
+          _id: match._id,
+          name: match.name,
+          role: match.role,
+        }));
         navigate(`/${match.role}-dashboard`);
         return;
       }
