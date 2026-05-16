@@ -1,12 +1,9 @@
+// Recharts temporarily disabled to avoid runtime hook/context issues
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement, LineElement, PointElement,
-  ArcElement, Title, Tooltip, Legend,
-} from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+
 import { logout } from '../../store/slices/authSlice';
 import {
   getAllDonations,
@@ -19,7 +16,7 @@ import '../../components/common/Dashboard.css';
 import DashboardLayout from '../../components/common/DashboardLayout';
 import Profile from '../Profile';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
+
 
 /* ─── Expiry helper ─────────────────────────────────────────── */
 const calcExpiry = (ts: number, now: number) => {
@@ -221,14 +218,6 @@ const NgoDashboard: React.FC = () => {
     { tab: 'profile', icon: 'fa-user-edit', label: 'My Profile' },
   ];
 
-  const doughnutData = {
-    labels: ['Food', 'Grains', 'Vegetables', 'Dairy'],
-    datasets: [{
-      data: [12, 19, 3, 5],
-      backgroundColor: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c'],
-    }],
-  };
-
   return (
     <DashboardLayout
       sidebarItems={sidebarItems}
@@ -237,13 +226,25 @@ const NgoDashboard: React.FC = () => {
       user={user}
       handleLogout={handleLogout}
     >
-      {loading && <div className="loading-spinner"><div></div></div>}
-      {apiError && <div className="error-msg">{apiError}</div>}
+      {loading && <div className="db-loading-bar">Loading rescue data…</div>}
+      {apiError && (
+        <div className="db-alert db-alert--error" role="alert">
+          We could not load NGO data. Please try again shortly.
+        </div>
+      )}
       {toastMsg && <div className={`toast ${toastType}`}>{toastMsg}</div>}
 
       {tab === 'overview' && (
         <>
-          <h1 className="db-title">NGO Dashboard</h1>
+          <div className="db-welcome-banner">
+            <div>
+              <h1 className="db-welcome-title">NGO overview</h1>
+              <p className="db-welcome-subtitle">{user?.name ? `${user.name} — ` : ''}Monitor claims, incoming deliveries, and distribution.</p>
+            </div>
+            <button className="db-btn db-btn-primary" onClick={() => setTab('donations')}>
+              <i className="fas fa-bullhorn"></i> Browse donations
+            </button>
+          </div>
           <div className="db-grid">
             <div className="db-stat-card">
               <div className="stat-icon"><i className="fas fa-hand-holding-heart"></i></div>
@@ -255,8 +256,8 @@ const NgoDashboard: React.FC = () => {
             <div className="db-stat-card">
               <div className="stat-icon"><i className="fas fa-users"></i></div>
               <div>
-                <div className="stat-value">1,200+</div>
-                <div className="stat-label">People Fed</div>
+                <div className="stat-value">{availableDonations.length}</div>
+                <div className="stat-label">Available now</div>
               </div>
             </div>
             <div className="db-stat-card">
@@ -267,14 +268,13 @@ const NgoDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="db-card">
-            <div className="db-card-header">
-              <h3 className="db-card-title">Received Donations by Category</h3>
-            </div>
-            <div className="db-card-body" style={{ height: '300px', display: 'flex', justifyContent: 'center' }}>
-              <Doughnut data={doughnutData} options={{ responsive: true, maintainAspectRatio: false }} />
-            </div>
-          </div>
+          <div className="db-card db-panel">
+            <div className="db-card-header"><h3 className="db-card-title">Operations</h3></div>
+            <div className="db-card-body"><ul className="db-ops-list">
+                <li><span>Available to claim</span><strong>{availableDonations.length}</strong></li>
+                <li><span>Incoming deliveries</span><strong>{myDeliveries.length}</strong></li>
+                <li><span>Completed distributions</span><strong>{completedDeliveries.length}</strong></li>
+              </ul></div></div>
         </>
       )}
 
@@ -317,8 +317,7 @@ const NgoDashboard: React.FC = () => {
         <>
           <h1 className="db-title">Incoming Deliveries</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
-              <table className="db-table">
+            <div className="db-table-wrap"><table className="db-table">
                 <thead>
                   <tr><th>Item</th><th>Volunteer</th><th>ETA</th><th>Status</th><th>Action</th></tr>
                 </thead>
@@ -351,8 +350,7 @@ const NgoDashboard: React.FC = () => {
         <>
           <h1 className="db-title">Distribution Log</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
-              <table className="db-table">
+            <div className="db-table-wrap"><table className="db-table">
                 <thead>
                   <tr><th>Date</th><th>Item</th><th>Quantity</th><th>Volunteer</th><th>Action</th></tr>
                 </thead>

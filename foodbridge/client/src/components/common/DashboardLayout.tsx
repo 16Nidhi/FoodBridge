@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
@@ -24,6 +24,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.classList.add('db-sidebar-open');
+    } else {
+      document.body.classList.remove('db-sidebar-open');
+    }
+    return () => document.body.classList.remove('db-sidebar-open');
+  }, [sidebarOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -70,8 +79,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
                 }}
               >
                                 <i className={`fas ${icon}`}></i> {label}
-                {notifCount && notifCount > 0 && <span className="notif-badge">{notifCount}</span>}
-                {notifCount && notifCount > 0 && <span className="notif-badge">{notifCount}</span>}
+                {notifCount != null && notifCount > 0 && (
+                  <span className="notif-badge">{notifCount}</span>
+                )}
               </button>
             ))}
           </div>

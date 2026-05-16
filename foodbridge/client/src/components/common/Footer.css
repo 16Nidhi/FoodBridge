@@ -6,9 +6,9 @@
   padding-top: 60px;
 }
 .fb-footer .inner {
-  max-width: 1200px;
+  max-width: var(--max-w);
   margin: 0 auto;
-  padding: 0 24px 40px;
+  padding: 0 var(--content-padding) 40px;
   display: grid;
   grid-template-columns: 1.8fr repeat(3, 1fr);
   gap: 40px;
@@ -94,12 +94,12 @@
   cursor: pointer;
   transition: transform .2s, box-shadow .2s;
 }
-.newsletter-form button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(16,185,129,0.28); }
+.newsletter-form button:hover { box-shadow: 0 4px 14px rgba(16,185,129,0.22); }
 .newsletter-thanks { color: var(--accent); font-size: 0.9rem; font-weight: 600; padding: 10px 0; }
 .footer-bar {
-  max-width: 1200px;
+  max-width: var(--max-w);
   margin: 0 auto;
-  padding: 18px 24px;
+  padding: 18px var(--content-padding);
   border-top: 1px solid rgba(255,255,255,0.06);
   display: flex;
   align-items: center;

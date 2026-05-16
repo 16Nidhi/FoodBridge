@@ -1,19 +1,16 @@
+// Recharts temporarily disabled to avoid runtime hook/context issues
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement, LineElement, PointElement,
-  ArcElement, Title, Tooltip, Legend,
-} from 'chart.js';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+
+
 import { logout } from '../../store/slices/authSlice';
 import { getAllDonations, claimDonation as volunteerAcceptPickup, completeDonation as apiMarkPickedUp, getMyDonations } from '../../services/api';
 import '../../components/common/Dashboard.css';
 import DashboardLayout from '../../components/common/DashboardLayout';
 import Profile from '../Profile';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
+
 
 /* ─── Types ────────────────────────────────────────────────── */
 type PickupStatus = 'available' | 'accepted' | 'in-transit' | 'completed';
@@ -88,8 +85,6 @@ const STATUS_COLORS: Record<PickupStatus, string> = {
   'in-transit':'badge-gray',
   completed:  'badge-green',
 };
-
-const WEEKS = ['Week 1','Week 2','Week 3','Week 4','Week 5','Week 6','Week 7'];
 
 type Tab = 'pickups' | 'active' | 'history' | 'stats' | 'profile';
 
@@ -170,22 +165,12 @@ const VolunteerDashboard: React.FC = () => {
   const pickupHistory = useMemo(() => myPickups.filter(p => p.status === 'completed'), [myPickups]);
 
   const sidebarItems = [
-    { tab: 'available', icon: 'fa-hand-sparkles', label: 'Available Pickups' },
+    { tab: 'pickups', icon: 'fa-hand-sparkles', label: 'Available Pickups' },
     { tab: 'active', icon: 'fa-truck-pickup', label: 'Active Pickups' },
     { tab: 'history', icon: 'fa-history', label: 'Pickup History' },
-    { tab: 'stats', icon: 'fa-chart-line', label: 'My Stats' },
+    { tab: 'stats', icon: 'fa-chart-simple', label: 'Summary' },
     { tab: 'profile', icon: 'fa-user-shield', label: 'My Profile' },
   ];
-
-  const lineData = {
-    labels: WEEKS,
-    datasets: [{
-      label: 'Pickups Completed',
-      data: [3, 5, 4, 7, 6, 8, 5],
-      borderColor: 'var(--c-primary)',
-      tension: 0.4,
-    }],
-  };
 
   return (
     <DashboardLayout
@@ -195,8 +180,12 @@ const VolunteerDashboard: React.FC = () => {
       user={user}
       handleLogout={handleLogout}
     >
-      {loading && <div className="loading-spinner"><div></div></div>}
-      {apiError && <div className="error-msg">{apiError}</div>}
+      {loading && <div className="db-loading-bar">Loading pickups…</div>}
+      {apiError && (
+        <div className="db-alert db-alert--error" role="alert">
+          We could not load pickup data. Please try again shortly.
+        </div>
+      )}
       {toastMsg && <div className={`toast ${toastType}`}>{toastMsg}</div>}
 
       {tab === 'pickups' && (
@@ -237,8 +226,7 @@ const VolunteerDashboard: React.FC = () => {
         <>
           <h1 className="db-title">My Active Pickups</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
-              <table className="db-table">
+            <div className="db-table-wrap"><table className="db-table">
                 <thead>
                   <tr><th>Item</th><th>From (Donor)</th><th>To (NGO)</th><th>Status</th><th>Action</th></tr>
                 </thead>
@@ -271,8 +259,7 @@ const VolunteerDashboard: React.FC = () => {
         <>
           <h1 className="db-title">My Pickup History</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
-              <table className="db-table">
+            <div className="db-table-wrap"><table className="db-table">
                 <thead>
                   <tr><th>Date</th><th>Item</th><th>From</th><th>To</th><th>Status</th></tr>
                 </thead>
@@ -295,42 +282,34 @@ const VolunteerDashboard: React.FC = () => {
 
       {tab === 'stats' && (
         <>
-          <h1 className="db-title">My Stats</h1>
+          <h1 className="db-title">Rescue summary</h1>
           <div className="db-grid">
             <div className="db-stat-card">
               <div className="stat-icon"><i className="fas fa-truck"></i></div>
               <div>
                 <div className="stat-value">{pickupHistory.length}</div>
-                <div className="stat-label">Total Pickups</div>
+                <div className="stat-label">Completed pickups</div>
               </div>
             </div>
             <div className="db-stat-card">
-              <div className="stat-icon"><i className="fas fa-star"></i></div>
+              <div className="stat-icon" style={{ background: 'var(--chip-info)' }}><i className="fas fa-route"></i></div>
               <div>
-                <div className="stat-value">4.8</div>
-                <div className="stat-label">Average Rating</div>
+                <div className="stat-value">{activePickups.length}</div>
+                <div className="stat-label">In progress</div>
               </div>
             </div>
             <div className="db-stat-card">
-              <div className="stat-icon"><i className="fas fa-trophy"></i></div>
+              <div className="stat-icon" style={{ background: 'var(--chip-warning)' }}><i className="fas fa-inbox"></i></div>
               <div>
-                <div className="stat-value">Gold</div>
-                <div className="stat-label">Volunteer Tier</div>
+                <div className="stat-value">{availablePickups.length}</div>
+                <div className="stat-label">Ready to accept</div>
               </div>
-            </div>
-          </div>
-          <div className="db-card">
-            <div className="db-card-header">
-              <h3 className="db-card-title">Weekly Pickup Activity</h3>
-            </div>
-            <div className="db-card-body" style={{ height: '300px' }}>
-              <Line data={lineData} options={{ responsive: true, maintainAspectRatio: false }} />
             </div>
           </div>
         </>
       )}
 
-      {tab === 'profile' && (
+            {tab === 'profile' && (
         <Profile />
       )}
     </DashboardLayout>

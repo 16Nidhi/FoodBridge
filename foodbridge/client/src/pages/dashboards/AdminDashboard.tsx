@@ -1,3 +1,4 @@
+// Recharts temporarily disabled to avoid runtime hook/context issues
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -5,18 +6,14 @@ import {
   adminGetStats, adminGetUsers, adminGetDonations, adminGetVerifications,
   adminReviewVerification, adminUpdateUserStatus, adminUpdateUserVerification,
 } from '../../services/api';
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement, LineElement, PointElement,
-  ArcElement, Title, Tooltip, Legend,
-} from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+
 import { logout } from '../../store/slices/authSlice';
 import '../../components/common/Dashboard.css';
 import DashboardLayout from '../../components/common/DashboardLayout';
 import Profile from '../Profile';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
+
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type UserRole   = 'donor' | 'ngo' | 'volunteer' | 'admin';
@@ -81,7 +78,7 @@ const NGO_APPROVAL_BADGE: Record<NgoApprovalStatus,string> = {
   pending:'badge-orange', approved:'badge-green', rejected:'badge-red',
 };
 
-type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users' | 'deliveries' | 'analytics' | 'verifications' | 'profile';
+type Tab = 'overview' | 'donors' | 'volunteers' | 'ngos' | 'users' | 'deliveries' | 'verifications' | 'profile';
 
 /* ═══════════════════════════════════════════════════════════════
    ADMIN DASHBOARD PAGE
@@ -264,67 +261,7 @@ const AdminDashboard: React.FC = () => {
     .filter(u => roleFilter==='all' || u.role===roleFilter)
     .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  /* ── Charts ── */
-  const lineData = {
-    labels: MONTHS,
-    datasets:[
-      { label:'Donations',  data:[42,65,78,91,110,136,158], borderColor:'var(--c-primary)', backgroundColor:'var(--chip-success)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'var(--c-primary)' },
-      { label:'Meals Saved',data:[380,590,760,840,990,1240,1430], borderColor:'var(--c-secondary)', backgroundColor:'var(--chip-info)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'var(--c-secondary)', yAxisID:'y2' },
-    ],
-  };
-  const lineOpts: any = {
-    responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{ position:'top' as const } },
-    scales:{
-      y:  { grid:{color:'rgba(0,0,0,0.04)'}, ticks:{color:'var(--c-muted)'}, title:{display:true,text:'Donations',color:'var(--c-primary)'} },
-      y2: { position:'right', grid:{drawOnChartArea:false}, ticks:{color:'var(--c-muted)'}, title:{display:true,text:'Meals',color:'var(--c-secondary)'} },
-      x:  { grid:{display:false}, ticks:{color:'var(--c-muted)'} },
-    },
-  };
-
-  const barData = {
-    labels:['Hotel Grandeur','Sunshine Hotel','Fresh Mart','City Bakery','Rajesh Sharma','Grand Catering'],
-    datasets:[{
-      label:'Donations Made',
-      data:[51,38,14,8,23,19],
-      backgroundColor:['var(--c-primary)','var(--c-secondary)','var(--c-accent)','var(--c-purple)','var(--c-danger)','var(--c-warning)'],
-      borderRadius:6, borderSkipped:false,
-    }],
-  };
-  const barOpts: any = {
-    responsive:true, maintainAspectRatio:false, indexAxis:'y' as const,
-    plugins:{ legend:{display:false} },
-    scales:{ x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'var(--c-muted)'}}, y:{grid:{display:false},ticks:{color:'var(--c-muted)'}} },
-  };
-
-  const roleDoughnut = {
-    labels:['Donors','Volunteers','NGOs','Admins'],
-    datasets:[{
-      data:[donors.length, volunteers.length, ngos.length, 1],
-      backgroundColor:['var(--c-primary)','var(--c-accent)','var(--c-secondary)','var(--c-purple)'],
-      borderWidth:2, borderColor:'var(--card-bg)',
-    }],
-  };
-  const doughnutOpts: any = {
-    responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{ position:'right' as const, labels:{font:{size:11},boxWidth:12} } },
-    cutout:'68%',
-  };
-
-  const userGrowthData = {
-    labels: MONTHS,
-    datasets:[{
-      label:'New Users',
-      data:[8,13,11,18,15,22,10],
-      backgroundColor:'var(--c-purple)',
-      borderRadius:6, borderSkipped:false,
-    }],
-  };
-  const growthOpts: any = {
-    responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{display:false} },
-    scales:{ x:{grid:{display:false},ticks:{color:'var(--c-muted)'}}, y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'var(--c-muted)'}} },
-  };
+  /* Charts removed — placeholders used in UI; data objects omitted to avoid unused imports */
 
   const sidebarItems = [
     { tab: 'overview', icon: 'fa-chart-line', label: 'Dashboard', notifCount: 0 },
@@ -334,14 +271,13 @@ const AdminDashboard: React.FC = () => {
     { tab: 'verifications', icon: 'fa-id-card', label: 'Volunteer Verifications', notifCount: pendingVerifs },
     { tab: 'ngos', icon: 'fa-building', label: 'NGOs', notifCount: pendingNgos },
     { tab: 'deliveries', icon: 'fa-truck-fast', label: 'Deliveries', notifCount: 0 },
-    { tab: 'analytics', icon: 'fa-chart-bar', label: 'Analytics', notifCount: 0 },
     { tab: 'profile', icon: 'fa-user-cog', label: 'My Profile', notifCount: 0 },
   ];
 
   /* ─── Reusable user table ─── */
   const UserTable = ({ data }: { data: AppUser[] }) => (
     <div className="db-card">
-      <div className="db-card-body" style={{ padding:0 }}>
+      <div className="db-table-wrap">
         <table className="db-table">
           <thead>
             <tr><th>Name</th><th>Email</th><th>Role</th><th>Location</th><th>Joined</th><th>Activity</th><th>Status</th><th>Actions</th></tr>
@@ -397,8 +333,12 @@ const AdminDashboard: React.FC = () => {
       user={user}
       handleLogout={handleLogout}
     >
-      {loading && <div className="loading-spinner"><div></div></div>}
-      {apiError && <div className="error-msg">{apiError}</div>}
+      {loading && <div className="db-loading-bar">Loading platform data…</div>}
+      {apiError && (
+        <div className="db-alert db-alert--error" role="alert">
+          We could not load admin data. Please try again shortly.
+        </div>
+      )}
       {toastMsg && <div className={`toast ${toastType}`}>{toastMsg}</div>}
 
       {/* ══════════ USER DETAILS MODAL ══════════ */}
@@ -449,7 +389,15 @@ const AdminDashboard: React.FC = () => {
       {/* ══════════ OVERVIEW TAB ══════════ */}
       {tab === 'overview' && (
         <>
-          <h1 className="db-title">Admin Dashboard</h1>
+          <div className="db-welcome-banner">
+            <div>
+              <h1 className="db-welcome-title">Platform overview</h1>
+              <p className="db-welcome-subtitle">Pending approvals, deliveries in flight, and user activity.</p>
+            </div>
+            <button className="db-btn db-btn-primary" onClick={() => setTab('verifications')}>
+              <i className="fas fa-id-card"></i> Review verifications
+            </button>
+          </div>
           <div className="db-grid">
             <div className="db-stat-card">
               <div className="stat-icon" style={{background:'var(--chip-success)'}}><i className="fas fa-users"></i></div>
@@ -481,24 +429,15 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="db-grid">
-            <div className="db-card" style={{ gridColumn: 'span 2' }}>
-              <div className="db-card-header">
-                <h3 className="db-card-title">Donation Trends</h3>
-              </div>
-              <div className="db-card-body" style={{ height: 300 }}>
-                <Line data={lineData} options={lineOpts} />
-              </div>
-            </div>
-            <div className="db-card">
-              <div className="db-card-header">
-                <h3 className="db-card-title">User Roles</h3>
-              </div>
-              <div className="db-card-body" style={{ height: 300 }}>
-                <Doughnut data={roleDoughnut} options={doughnutOpts} />
-              </div>
-            </div>
-          </div>
+                    <div className="db-card db-panel">
+            <div className="db-card-header"><h3 className="db-card-title">Operations</h3></div>
+            <div className="db-card-body"><ul className="db-ops-list">
+                <li><span>Active users</span><strong>{activeCount}</strong></li>
+                <li><span>Deliveries in progress</span><strong>{activePickups}</strong></li>
+                <li><span>Completed deliveries</span><strong>{completedDeliveries}</strong></li>
+                <li><span>Pending NGO approvals</span><strong>{pendingNgos}</strong></li>
+                <li><span>Pending volunteer verifications</span><strong>{pendingVerifs}</strong></li>
+              </ul></div></div>
         </>
       )}
 
@@ -532,7 +471,7 @@ const AdminDashboard: React.FC = () => {
         <>
           <h1 className="db-title">NGO Registrations</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
+            <div className="db-table-wrap">
               <table className="db-table">
                 <thead>
                   <tr><th>Organization</th><th>Contact</th><th>Applied On</th><th>Status</th><th>Actions</th></tr>
@@ -570,7 +509,7 @@ const AdminDashboard: React.FC = () => {
         <>
           <h1 className="db-title">Volunteer Verifications</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
+            <div className="db-table-wrap">
               <table className="db-table">
                 <thead>
                   <tr><th>Name</th><th>ID Type</th><th>ID Number</th><th>Applied On</th><th>Status</th><th>Actions</th></tr>
@@ -614,7 +553,7 @@ const AdminDashboard: React.FC = () => {
         <>
           <h1 className="db-title">Platform Deliveries</h1>
           <div className="db-card">
-            <div className="db-card-body" style={{ padding: 0 }}>
+            <div className="db-table-wrap">
               <table className="db-table">
                 <thead>
                   <tr><th>Item</th><th>Donor</th><th>Volunteer</th><th>NGO</th><th>Date</th><th>Status</th></tr>
@@ -632,23 +571,6 @@ const AdminDashboard: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ══════════ ANALYTICS TAB ══════════ */}
-      {tab === 'analytics' && (
-        <>
-          <h1 className="db-title">Analytics</h1>
-          <div className="db-grid">
-            <div className="db-card" style={{ gridColumn: 'span 2' }}>
-              <div className="db-card-header"><h3 className="db-card-title">Top Donors</h3></div>
-              <div className="db-card-body" style={{ height: 350 }}><Bar data={barData} options={barOpts} /></div>
-            </div>
-            <div className="db-card">
-              <div className="db-card-header"><h3 className="db-card-title">New User Growth</h3></div>
-              <div className="db-card-body" style={{ height: 350 }}><Bar data={userGrowthData} options={growthOpts} /></div>
             </div>
           </div>
         </>

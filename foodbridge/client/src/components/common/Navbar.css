@@ -1,30 +1,35 @@
-/* Navbar styles */
 /* ==============================
-   FoodBridge Navbar — SaaS style
+   FoodBridge Navbar
    ============================== */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600&display=swap');
 
 .fb-nav {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(248,250,252,0.85);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  border-bottom: 1px solid rgba(226,232,240,0.7);
-  box-shadow: 0 2px 22px rgba(2,6,23,0.05);
-  font-family: 'Poppins', sans-serif;
-  transition: all 0.25s ease;
+  background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  font-family: var(--ff-head);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fb-nav.scrolled {
+  background: var(--card-bg);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="dark"] .fb-nav.scrolled {
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
 }
 
 .fb-nav .inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-  height: 66px;
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: var(--space-md);
+  min-height: var(--nav-height);
+  padding-block: var(--space-sm);
+  position: relative;
 }
 
 /* Brand */
@@ -32,24 +37,49 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: var(--accent);
   flex-shrink: 0;
   text-decoration: none;
+  min-width: 0;
 }
-.fb-brand svg,
-.fb-brand .leaf { color: var(--accent); font-size: 1.15rem; }
 
-/* Nav links */
+.fb-brand-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fb-brand .leaf {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Panel: links + actions */
+.fb-nav-panel {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-md);
+}
+
 .fb-links {
   display: flex;
   align-items: center;
   gap: 2px;
   flex: 1;
-  padding-left: 32px;
+  min-width: 0;
+  padding-left: var(--space-lg);
   list-style: none;
+  margin: 0;
 }
+
+.fb-links li {
+  margin: 0;
+}
+
 .fb-links a {
   display: block;
   padding: 8px 14px;
@@ -58,52 +88,99 @@
   font-weight: 600;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: background 0.2s, color 0.2s, transform 0.2s;
-}
-.fb-links a:hover {
-  color: var(--accent);
-  background: rgba(16,185,129,0.08);
-  transform: translateY(-1px);
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
 }
 
-/* Actions */
+.fb-links a:hover {
+  color: var(--accent);
+  background: var(--hover-bg);
+}
+
+.fb-links a.active {
+  color: var(--accent);
+  background: var(--hover-bg);
+}
+
+/* Hide duplicate dashboard link in desktop nav links (shown in actions) */
+@media (min-width: 901px) {
+  .fb-links-dashboard {
+    display: none;
+  }
+}
+
 .fb-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
   flex-shrink: 0;
+  min-width: 0;
 }
+
 .nav-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 9px 22px;
+  padding: 9px 18px;
   border-radius: 9999px;
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--ff-head);
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   border: none;
   cursor: pointer;
   text-decoration: none;
-  transition: all 0.25s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  max-width: 100%;
 }
+
+.nav-btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 .nav-btn-ghost {
   background: transparent;
   color: var(--text-secondary);
-  border: 1.5px solid var(--border-color);
+  border: 1px solid var(--border-color);
 }
+
 .nav-btn-ghost:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
+
 .nav-btn-primary {
-  background: linear-gradient(90deg,var(--accent),#059669);
-  color: var(--text-primary);
-  box-shadow: 0 6px 24px rgba(16,185,129,0.25);
+  background: linear-gradient(135deg, var(--accent), var(--c-primary-dk));
+  color: #fff;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2);
 }
+
 .nav-btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 32px rgba(16,185,129,0.35);
+  filter: brightness(1.05);
+}
+
+.theme-toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.nav-role-badge {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--chip-success);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 /* Mobile toggle */
@@ -112,106 +189,99 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 6px;
+  padding: 8px;
+  margin-left: auto;
   flex-direction: column;
+  justify-content: center;
   gap: 5px;
-  margin-left: 12px;
+  flex-shrink: 0;
+  z-index: 1002;
 }
+
 .fb-toggle span {
   display: block;
   width: 22px;
   height: 2px;
-  background: var(--text-secondary);
+  background: var(--text-primary);
   border-radius: 2px;
-  transition: all 0.25s;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-/* Role badge in nav (when logged in) */
-.nav-role-badge {
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: rgba(16,185,129,0.1);
-  color: var(--accent);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+.fb-toggle.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
 }
 
-/* Active link */
-.fb-links a.active {
-  color: var(--accent);
-  background: rgba(16,185,129,0.08);
+.fb-toggle.open span:nth-child(2) {
+  opacity: 0;
 }
 
-.fb-nav.scrolled {
-  background: var(--card-bg);
-  box-shadow: 0 4px 32px rgba(2,6,23,0.10);
+.fb-toggle.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
-/* Animated hamburger → X */
-.fb-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.fb-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.fb-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.fb-nav-backdrop {
+  display: none;
+}
 
-/* Notification styles */
+/* Notifications */
 .notification-wrapper {
   position: relative;
 }
 
 .notification-btn {
   position: relative;
-  padding: 8px;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .notification-badge {
   position: absolute;
-  top: 0;
-  right: 0;
-  background-color: #ef4444;
-  color: white;
+  top: 2px;
+  right: 2px;
+  background-color: var(--c-danger);
+  color: #fff;
   border-radius: 50%;
-  width: 18px;
+  min-width: 18px;
   height: 18px;
+  padding: 0 4px;
   font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .notification-dropdown {
   position: absolute;
-  top: 120%;
+  top: calc(100% + 8px);
   right: 0;
-  background-color: var(--card-bg);
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  width: 350px;
-  max-height: 400px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  width: min(350px, calc(100vw - 2rem));
+  max-height: min(400px, 70vh);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  z-index: 1100;
+}
+
+[data-theme="dark"] .notification-dropdown {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
 
 .notification-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .notification-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
 }
 
 .notification-header button {
@@ -219,7 +289,14 @@
   border: none;
   color: var(--accent);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notification-header button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .notification-list {
@@ -227,23 +304,32 @@
 }
 
 .notification-item {
+  display: block;
+  width: 100%;
+  text-align: left;
   padding: 0.75rem 1rem;
+  border: none;
   border-bottom: 1px solid var(--border-color);
+  background: transparent;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease;
+  font-family: inherit;
 }
 
 .notification-item:hover {
-  background-color: var(--hover-bg);
+  background: var(--hover-bg);
 }
 
 .notification-item.unread {
-  background-color: var(--unread-bg);
+  background: var(--unread-bg);
 }
 
 .notification-item p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .notification-item small {
@@ -255,22 +341,118 @@
   padding: 1.5rem;
   text-align: center;
   color: var(--text-secondary);
+  margin: 0;
 }
 
-@media (max-width: 768px) {
-  .fb-actions { display: none; }
-  .fb-toggle { display: flex; }
-  .fb-links.open {
+/* Body scroll lock when menu open */
+body.nav-menu-open {
+  overflow: hidden;
+}
+
+/* —— Tablet / mobile —— */
+@media (max-width: 900px) {
+  .fb-toggle {
     display: flex;
+  }
+
+  .fb-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: var(--nav-height);
+    background: rgba(15, 23, 42, 0.45);
+    border: none;
+    cursor: pointer;
+    z-index: 999;
+  }
+
+  .fb-nav-panel {
+    position: fixed;
+    top: var(--nav-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1001;
     flex-direction: column;
-    align-items: flex-start;
-    position: absolute;
-    top: 66px; left: 0; right: 0;
-    background: rgba(248,250,252,0.98);
-    backdrop-filter: blur(22px);
+    align-items: stretch;
+    gap: 0;
+    padding: var(--space-md) var(--content-padding) var(--space-xl);
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  }
+
+  .fb-nav.menu-open .fb-nav-panel {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .fb-links {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 0 var(--space-md);
     border-bottom: 1px solid var(--border-color);
-    padding: 16px 20px;
-    box-shadow: 0 12px 40px rgba(2,6,23,0.07);
-    gap: 4px;
+    margin-bottom: var(--space-md);
+  }
+
+  .fb-links a {
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+
+  .fb-links-dashboard {
+    display: list-item;
+  }
+
+  .fb-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .fb-actions .nav-btn:not(.nav-btn-icon) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .fb-actions .notification-wrapper {
+    width: 100%;
+  }
+
+  .fb-actions .notification-btn {
+    width: 100%;
+    border-radius: 10px;
+  }
+
+  .notification-dropdown {
+    position: fixed;
+    top: auto;
+    bottom: var(--space-md);
+    left: var(--content-padding);
+    right: var(--content-padding);
+    width: auto;
+  }
+
+  .nav-role-badge {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .fb-brand {
+    font-size: 1.05rem;
+  }
+
+  .nav-btn {
+    font-size: 0.8rem;
+    padding: 10px 16px;
   }
 }

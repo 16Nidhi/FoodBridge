@@ -5,27 +5,58 @@ import { RootState, AppDispatch } from '../../store';
 import { claimDonationThunk, optimisticClaim, clearOptimisticUpdate } from '../../store/slices/listingSlice';
 import { completeDonation, deleteDonation, addRating } from '../../services/api';
 import RatingModal from './RatingModal';
+import {
+  formatExpiryTiming,
+  formatListedAgo,
+  formatPickupEta,
+  parseDate,
+  getDonorTypeLabel,
+  getRescuePartnerLabel,
+  getRescueUrgency,
+  getStatusLabel,
+  isDemoListingId,
+  normalizeDonation,
+} from '../listings/listingUtils';
+import './ListingCard.css';
 
 interface ListingCardProps {
   listing: Donation;
   onUpdate: () => void;
   onEdit?: () => void;
+  isDemo?: boolean;
 }
 
-const ListingCard: React.FC<ListingCardProps> = ({ listing: initialListing, onUpdate, onEdit }) => {
+const URGENCY_LABELS = {
+  high: 'Urgent',
+  medium: 'Soon',
+  low: 'Flexible',
+} as const;
+
+const ListingCard: React.FC<ListingCardProps> = ({
+  listing: initialListing,
+  onUpdate,
+  onEdit,
+  isDemo: isDemoProp,
+}) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch<AppDispatch>();
   const optimisticUpdates = useSelector((state: RootState) => state.listings.optimisticUpdates);
-  const loading = useSelector((state: RootState) => state.listings.loading);
+  const claimLoading = useSelector((state: RootState) => state.listings.loading);
 
   const [isRatingModalOpen, setRatingModalOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Apply optimistic updates
-  const listing = optimisticUpdates[initialListing._id]
+  const rawListing = optimisticUpdates[initialListing._id]
     ? { ...initialListing, ...optimisticUpdates[initialListing._id] }
     : initialListing;
+
+  const listing = normalizeDonation(
+    rawListing as Donation & Record<string, unknown>
+  );
+  const isDemo = isDemoProp ?? isDemoListingId(listing._id);
+  const urgency = getRescueUrgency(listing);
+  const rescuePartner = getRescuePartnerLabel(listing);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -33,9 +64,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing: initialListing, onUp
   };
 
   const handleClaim = async () => {
+    if (isDemo) return;
     setShowConfirmModal(false);
-    
-    // Instant UI update
     dispatch(optimisticClaim({ id: listing._id, user }));
 
     try {
@@ -43,31 +73,46 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing: initialListing, onUp
       await dispatch(claimDonationThunk(listing._id)).unwrap();
       showToast('Donation claimed successfully!', 'success');
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       dispatch(clearOptimisticUpdate(listing._id));
-      showToast(error.message || 'Failed to claim donation', 'error');
+      const msg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Could not claim this donation. Please try again.';
+      showToast(
+        /network error/i.test(msg)
+          ? 'Connection issue — please check your network and try again.'
+          : msg,
+        'error'
+      );
     }
   };
 
   const handleComplete = async () => {
-    if (window.confirm('Are you sure you want to mark this donation as completed?')) {
+    if (isDemo) return;
+    if (window.confirm('Mark this donation as completed?')) {
       await completeDonation(listing._id);
       onUpdate();
     }
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this donation?')) {
+    if (isDemo) return;
+    if (window.confirm('Delete this donation listing?')) {
       await deleteDonation(listing._id);
       onUpdate();
     }
   };
 
   const handleRate = async (rating: number, review: string) => {
+    if (isDemo) return;
     try {
-      const ratedUserId = user?._id === listing.donor._id ? listing.claimedBy?._id : listing.donor._id;
+      const ratedUserId =
+        user?._id === listing.donor._id
+          ? listing.claimedBy?._id
+          : listing.donor._id;
       if (!ratedUserId) {
-        alert('Error: The other user could not be identified for rating.');
+        showToast('Unable to identify who to rate for this donation.', 'error');
         return;
       }
       await addRating({
@@ -76,126 +121,248 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing: initialListing, onUp
         rating,
         review,
       });
-      alert('Thank you for your feedback!');
+      showToast('Thank you for your feedback!', 'success');
       setRatingModalOpen(false);
-      onUpdate(); // Refresh listings to potentially hide the rate button
-    } catch (error: any) {
-      alert(`Failed to submit rating: ${error.response?.data?.message || error.message}`);
+      onUpdate();
+    } catch (error: unknown) {
+      const msg =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message
+          ? String(
+              (error as { response?: { data?: { message?: string } } }).response
+                ?.data?.message
+            )
+          : 'Could not submit your rating. Please try again.';
+      showToast(msg, 'error');
     }
   };
 
-  const canClaim = user && (user.role === 'ngo' || user.role === 'volunteer') && listing.status === 'pending';
-  const canComplete = user && listing.claimedBy && user._id === listing.claimedBy._id && listing.status === 'claimed';
-  const canEditOrDelete = user && user._id === listing.donor._id && listing.status === 'pending';
-  
+  const canClaim =
+    !isDemo &&
+    user &&
+    (user.role === 'ngo' || user.role === 'volunteer') &&
+    listing.status === 'pending';
+  const canComplete =
+    !isDemo &&
+    user &&
+    listing.claimedBy &&
+    user._id === listing.claimedBy._id &&
+    listing.status === 'claimed';
+  const canEditOrDelete =
+    !isDemo &&
+    user &&
+    user._id === listing.donor._id &&
+    listing.status === 'pending';
+
   const isDonationCompleted = listing.status === 'completed';
   const isUserDonor = user && user._id === listing.donor._id;
-  const isUserClaimer = user && listing.claimedBy && user._id === listing.claimedBy._id;
-  const canRate = isDonationCompleted && (isUserDonor || isUserClaimer);
+  const isUserClaimer =
+    user && listing.claimedBy && user._id === listing.claimedBy._id;
+  const canRate = !isDemo && isDonationCompleted && (isUserDonor || isUserClaimer);
 
-  const getStatusBadgeColor = () => {
-    switch (listing.status) {
-      case 'pending':
-        return '#f97316'; // Orange
-      case 'claimed':
-        return '#3b82f6'; // Blue
-      case 'completed':
-        return '#22c55e'; // Green
-      default:
-        return '#6b7280'; // Gray
-    }
-  };
+  const pickupDisplay = formatPickupEta(listing.pickupTime);
+  const expiryDisplay = formatExpiryTiming(listing);
+  const listedDisplay = formatListedAgo(listing.createdAt);
+  const pickupWindow = parseDate(listing.pickupTime);
+  const pickupWindowLabel = pickupWindow
+    ? pickupWindow.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'TBD';
 
   return (
-    <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 16, marginBottom: 12, background: 'var(--card-bg)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <p style={{ fontWeight: 600 }}>{listing.foodItem}</p>
-        <span style={{
-          backgroundColor: getStatusBadgeColor(),
-          color: 'white',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          fontSize: '0.75rem',
-          fontWeight: 500,
-          textTransform: 'capitalize'
-        }}>
-          {listing.status}
-        </span>
-      </div>
-      <p style={{ fontSize: '0.85rem', color: '#64748B' }}>Qty: {listing.quantity} · {listing.pickupLocation}</p>
-      <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-        Pickup Time: {new Date(listing.pickupTime).toLocaleString()}
-      </p>
-      {listing.claimedBy && (
-        <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-          Claimed by: {listing.claimedBy.name}
-        </p>
-      )}
-      <div style={{ marginTop: '1rem', position: 'relative' }}>
-        {canClaim && (
-          <button 
-            onClick={() => setShowConfirmModal(true)}
-            disabled={loading}
-            style={{ 
-              opacity: loading ? 0.7 : 1, 
-              cursor: loading ? 'not-allowed' : 'pointer' 
-            }}
+    <article
+      className={`listing-card${isDemo ? ' listing-card--demo' : ''}`}
+    >
+      <header className="listing-card__header">
+        <div className="listing-card__title-block">
+          <h3 className="listing-card__title">{listing.foodItem}</h3>
+          {listing.category && (
+            <span className="listing-card__category">{listing.category}</span>
+          )}
+        </div>
+        <div className="listing-card__badges">
+          {isDemo && <span className="listing-card__demo-tag">Sample</span>}
+          <span
+            className={`listing-card__status listing-card__status--${listing.status}`}
           >
-            {loading ? 'Claiming...' : 'Claim Donation'}
-          </button>
+            {getStatusLabel(listing.status)}
+          </span>
+          {urgency !== 'none' && (
+            <span className={`listing-card__urgency listing-card__urgency--${urgency}`}>
+              {URGENCY_LABELS[urgency]}
+            </span>
+          )}
+        </div>
+      </header>
+
+      <div className="listing-card__meta-grid">
+        <div className="listing-card__meta-row listing-card__donor-line">
+          <span className="listing-card__meta-icon" aria-hidden="true">
+            👤
+          </span>
+          <span>
+            <strong>{listing.donor.name}</strong>
+            <br />
+            {getDonorTypeLabel(listing.donor)}
+          </span>
+        </div>
+
+        {rescuePartner && (
+          <div className="listing-card__meta-row">
+            <span className="listing-card__meta-icon" aria-hidden="true">
+              🏢
+            </span>
+            <span>
+              Rescue partner: <strong>{rescuePartner}</strong>
+            </span>
+          </div>
         )}
-        {canComplete && <button onClick={handleComplete}>Mark as Completed</button>}
-        {canEditOrDelete && (
-          <>
-            <button style={{ marginRight: '0.5rem' }} onClick={onEdit}>Edit</button>
-            <button onClick={handleDelete}>Delete</button>
-          </>
+
+        <div className="listing-card__meta-row">
+          <span className="listing-card__meta-icon" aria-hidden="true">
+            📦
+          </span>
+          <span>
+            Quantity: <strong>{listing.quantity}</strong>
+          </span>
+        </div>
+
+        <div className="listing-card__meta-row">
+          <span className="listing-card__meta-icon" aria-hidden="true">
+            📍
+          </span>
+          <span>{listing.pickupLocation}</span>
+        </div>
+
+        <div className="listing-card__meta-row">
+          <span className="listing-card__meta-icon" aria-hidden="true">
+            🕐
+          </span>
+          <span>
+            Pickup ETA: <strong>{pickupDisplay}</strong>
+          </span>
+        </div>
+
+        <div className="listing-card__meta-row">
+          <span className="listing-card__meta-icon" aria-hidden="true">
+            ⏳
+          </span>
+          <span>{expiryDisplay}</span>
+        </div>
+
+        {listing.description && (
+          <div className="listing-card__meta-row">
+            <span className="listing-card__meta-icon" aria-hidden="true">
+              📝
+            </span>
+            <span>{listing.description}</span>
+          </div>
         )}
-        {canRate && <button onClick={() => setRatingModalOpen(true)}>Rate Transaction</button>}
       </div>
 
-      {/* Confirmation Modal */}
+      <div className="listing-card__timestamps">
+        <span>{listedDisplay}</span>
+        <span>Pickup window: {pickupWindowLabel}</span>
+      </div>
+
+      {(canClaim || canComplete || canEditOrDelete || canRate) && (
+        <div className="listing-card__actions">
+          {canClaim && (
+            <button
+              type="button"
+              className="listing-card__btn listing-card__btn--primary"
+              onClick={() => setShowConfirmModal(true)}
+              disabled={claimLoading}
+            >
+              {claimLoading ? 'Claiming…' : 'Claim donation'}
+            </button>
+          )}
+          {canComplete && (
+            <button
+              type="button"
+              className="listing-card__btn listing-card__btn--primary"
+              onClick={handleComplete}
+            >
+              Mark completed
+            </button>
+          )}
+          {canEditOrDelete && (
+            <>
+              {onEdit && (
+                <button
+                  type="button"
+                  className="listing-card__btn listing-card__btn--secondary"
+                  onClick={onEdit}
+                >
+                  Edit
+                </button>
+              )}
+              <button
+                type="button"
+                className="listing-card__btn listing-card__btn--danger"
+                onClick={handleDelete}
+              >
+                Delete
+              </button>
+            </>
+          )}
+          {canRate && (
+            <button
+              type="button"
+              className="listing-card__btn listing-card__btn--secondary"
+              onClick={() => setRatingModalOpen(true)}
+            >
+              Rate transaction
+            </button>
+          )}
+        </div>
+      )}
+
       {showConfirmModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center',
-          alignItems: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            background: 'var(--card-bg)', padding: '2rem', borderRadius: 'var(--r-sm)',
-            maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: 'var(--sh-sm)'
-          }}>
-            <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>Confirm Claim</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-              Are you sure you want to claim this donation?
+        <div
+          className="listing-card__modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="claim-modal-title"
+        >
+          <div className="listing-card__modal">
+            <h3 id="claim-modal-title">Confirm claim</h3>
+            <p>
+              You are claiming <strong>{listing.foodItem}</strong> from{' '}
+              {listing.donor.name}. Pickup: {pickupDisplay}.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button 
+            <div className="listing-card__modal-actions">
+              <button
+                type="button"
+                className="listing-card__btn listing-card__btn--secondary"
                 onClick={() => setShowConfirmModal(false)}
-                style={{ background: 'var(--border-color)', color: 'var(--text-primary)' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
+                type="button"
+                className="listing-card__btn listing-card__btn--primary"
                 onClick={handleClaim}
-                style={{ background: 'var(--c-primary)', color: 'var(--on-primary)' }}
               >
-                Confirm Claim
+                Confirm claim
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: '20px', right: '20px',
-          background: toast.type === 'success' ? 'var(--c-primary)' : 'var(--c-danger)',
-          color: 'var(--on-primary)', padding: '14px 24px', borderRadius: 'var(--r-sm)',
-          boxShadow: 'var(--sh-sm)', zIndex: 1001,
-          fontWeight: 500, animation: 'fadeIn 0.3s ease-in-out'
-        }}>
+        <div
+          className={`listing-card__toast listing-card__toast--${toast.type}`}
+          role="status"
+        >
           {toast.message}
         </div>
       )}
@@ -205,10 +372,14 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing: initialListing, onUp
           isOpen={isRatingModalOpen}
           onClose={() => setRatingModalOpen(false)}
           onSubmit={handleRate}
-          userNameToRate={user?._id === listing.donor._id ? listing.claimedBy?.name : listing.donor.name}
+          userNameToRate={
+            user?._id === listing.donor._id
+              ? listing.claimedBy?.name
+              : listing.donor.name
+          }
         />
       )}
-    </div>
+    </article>
   );
 };
 

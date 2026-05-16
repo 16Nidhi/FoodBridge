@@ -5,9 +5,13 @@ import App from './App';
 // Apply persisted theme before loading CSS to avoid a brief flash
 try {
   const _theme = localStorage.getItem('theme');
-  if (_theme) document.documentElement.setAttribute('data-theme', _theme);
-} catch (e) {
-  // ignore when running in environments without localStorage
+  if (_theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+} catch {
+  // ignore when localStorage is unavailable
 }
 import './index.css';
 import ErrorBoundary from './components/common/ErrorBoundary';

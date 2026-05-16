@@ -55,14 +55,18 @@ const App: React.FC = () => {
   }, [dispatch, user]);
 
   if (isLoading) {
-    return <div className="loading-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#64748b' }}>Loading FoodBridge...</div>;
+    return (
+      <div className="app app--loading">
+        <p className="app-loading-text">Loading FoodBridge…</p>
+      </div>
+    );
   }
 
   return (
     <Router>
       <div className="app">
         <Navbar />
-        <main>
+        <main className="app-main" id="main-content">
           <AppRoutes />
         </main>
         <Footer />

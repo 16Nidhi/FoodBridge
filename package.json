@@ -6,5 +6,6 @@
     "dev": "npm --prefix ./foodbridge/client run dev",
     "install-client": "npm --prefix ./foodbridge/client install",
     "start-client": "npm --prefix ./foodbridge/client run start"
-  }
+  },
+  "dependencies": {}
 }

@@ -26,3 +26,6 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Puppet / test logs
+foodbridge/client/puppet_console_logs.json
+foodbridge/client/puppet_visit_logs.json

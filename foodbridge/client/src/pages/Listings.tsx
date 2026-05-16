@@ -1,100 +1,226 @@
-import React, { useEffect, useState } from 'react';
-import { fetchFoodListings } from '../services/api';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { getAllDonations } from '../services/api';
 import ListingCard from '../components/common/ListingCard';
-import { FoodListing } from '../types';
-
-const FALLBACK_LISTINGS: FoodListing[] = [
-    {
-        id: 'demo-1',
-        donorId: 'demo-donor',
-        description: 'Freshly packed vegetable pulao (approx. 20 servings)',
-        quantity: 20,
-        pickupLocation: 'MG Road, Bengaluru',
-        expiryDate: new Date(Date.now() + 6 * 60 * 60 * 1000),
-    },
-    {
-        id: 'demo-2',
-        donorId: 'demo-donor',
-        description: 'Bakery surplus: mixed bread and buns',
-        quantity: 12,
-        pickupLocation: 'Park Street, Kolkata',
-        expiryDate: new Date(Date.now() + 4 * 60 * 60 * 1000),
-    },
-    {
-        id: 'demo-3',
-        donorId: 'demo-donor',
-        description: 'Fruit boxes from event catering',
-        quantity: 15,
-        pickupLocation: 'Bandra West, Mumbai',
-        expiryDate: new Date(Date.now() + 8 * 60 * 60 * 1000),
-    },
-];
+import ListingSkeleton from '../components/listings/ListingSkeleton';
+import {
+  filterListings,
+  getListingsFetchNotice,
+  MOCK_LISTINGS,
+  normalizeDonation,
+  shouldUseDemoFallback,
+} from '../components/listings/listingUtils';
+import { Donation } from '../types';
+import './Listings.css';
 
 const Listings: React.FC = () => {
-    const [listings, setListings] = useState<FoodListing[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [usingFallback, setUsingFallback] = useState(false);
+  const [listings, setListings] = useState<Donation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usingDemo, setUsingDemo] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [foodTypeFilter, setFoodTypeFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
 
-    useEffect(() => {
-        const getListings = async () => {
-            try {
-                const data = await fetchFoodListings();
-                setListings(data);
-                setUsingFallback(false);
-            } catch (err: unknown) {
-                setError(err instanceof Error ? err.message : String(err));
-                setListings(FALLBACK_LISTINGS);
-                setUsingFallback(true);
-            } finally {
-                setLoading(false);
-            }
-        };
+  const fetchListings = useCallback(async () => {
+    setLoading(true);
+    setNotice(null);
 
-        getListings();
-    }, []);
-
-    if (loading) {
-        return (
-            <main style={{ maxWidth: 1000, margin: '32px auto', padding: '0 16px' }}>
-                <h1>Available Food Listings</h1>
-                <p style={{ color: '#64748B' }}>Loading listings...</p>
-            </main>
+    try {
+      const data = await getAllDonations({
+        search: searchQuery,
+        foodType: foodTypeFilter,
+        location: locationFilter,
+      });
+      const normalized = (data ?? []).map((d) =>
+        normalizeDonation(d as Donation & Record<string, unknown>)
+      );
+      setListings(normalized);
+      setUsingDemo(false);
+    } catch (err: unknown) {
+      if (shouldUseDemoFallback(err)) {
+        const filtered = filterListings(MOCK_LISTINGS, {
+          search: searchQuery,
+          foodType: foodTypeFilter,
+          location: locationFilter,
+        });
+        setListings(filtered);
+        setUsingDemo(true);
+        setNotice(getListingsFetchNotice(err));
+      } else {
+        setListings([]);
+        setUsingDemo(false);
+        setNotice(
+          'Listings could not be loaded. Try again in a moment or adjust your filters.'
         );
+      }
+    } finally {
+      setLoading(false);
     }
+  }, [searchQuery, foodTypeFilter, locationFilter]);
 
-    return (
-        <main style={{ maxWidth: 1000, margin: '32px auto', padding: '0 16px' }}>
-            <h1>Available Food Listings</h1>
-            <p style={{ color: '#64748B', marginTop: 6, marginBottom: 18 }}>
-                Browse nearby surplus food available for pickup.
-            </p>
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
-            {usingFallback && (
-                <div style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
-                    Live listings are unavailable right now ({error || 'network issue'}). Showing demo listings.
-                </div>
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchListings();
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setFoodTypeFilter('');
+    setLocationFilter('');
+  };
+
+  const displayCount = listings.length;
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() || foodTypeFilter || locationFilter.trim()
+  );
+
+  const subtitle = useMemo(() => {
+    if (loading) return 'Loading surplus food available for pickup near you…';
+    if (usingDemo) return 'Browsing sample listings — connect to the server for live rescues.';
+    return 'Browse nearby surplus food available for pickup.';
+  }, [loading, usingDemo]);
+
+  return (
+    <main className="listings-page">
+      <header className="listings-header">
+        <p className="listings-eyebrow">Rescue network</p>
+        <h1>Available food listings</h1>
+        <p className="listings-subtitle">{subtitle}</p>
+      </header>
+
+      {notice && (
+        <div className="listings-notice" role="status">
+          <span className="listings-notice__icon" aria-hidden="true">
+            ℹ️
+          </span>
+          <p>{notice}</p>
+          <button
+            type="button"
+            className="listings-notice__retry"
+            onClick={fetchListings}
+            disabled={loading}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div className="filters-container">
+        <form onSubmit={handleSearch} className="search-form">
+          <label className="visually-hidden" htmlFor="listings-search">
+            Search listings
+          </label>
+          <input
+            id="listings-search"
+            type="search"
+            placeholder="Search food, donor, or description…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+          <button type="submit" className="search-button" disabled={loading}>
+            Search
+          </button>
+        </form>
+        <div className="filter-dropdowns">
+          <label className="visually-hidden" htmlFor="food-type-filter">
+            Food type
+          </label>
+          <select
+            id="food-type-filter"
+            value={foodTypeFilter}
+            onChange={(e) => setFoodTypeFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">All food types</option>
+            <option value="Fruits">Fruits</option>
+            <option value="Vegetables">Vegetables</option>
+            <option value="Dairy">Dairy</option>
+            <option value="Bakery">Bakery</option>
+            <option value="Canned Goods">Canned Goods</option>
+            <option value="Meals">Meals</option>
+            <option value="Other">Other</option>
+          </select>
+          <label className="visually-hidden" htmlFor="location-filter">
+            Location
+          </label>
+          <input
+            id="location-filter"
+            type="text"
+            placeholder="Filter by area or address…"
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="filter-input"
+          />
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="filter-clear-btn"
+              onClick={handleClearFilters}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="listings-toolbar">
+        <p className="listings-count" aria-live="polite">
+          {loading
+            ? 'Loading…'
+            : `${displayCount} listing${displayCount === 1 ? '' : 's'} found`}
+        </p>
+      </div>
+
+      {loading ? (
+        <ListingSkeleton count={6} />
+      ) : displayCount === 0 ? (
+        <div className="listings-empty">
+          <div className="listings-empty__icon" aria-hidden="true">
+            🍽️
+          </div>
+          <h2>No listings match</h2>
+          <p>
+            {hasActiveFilters
+              ? 'Try broadening your search or clearing filters to see more surplus food.'
+              : usingDemo
+                ? 'Sample data has no matches for these filters.'
+                : 'There is no surplus food posted right now. Check back soon or post a donation.'}
+          </p>
+          <div className="listings-empty__actions">
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="listings-btn listings-btn--secondary"
+                onClick={handleClearFilters}
+              >
+                Clear filters
+              </button>
             )}
-
-            {!usingFallback && error && (
-                <div style={{ background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
-                    Could not load listings: {error}
-                </div>
-            )}
-
-            {listings.length === 0 && (
-                <div style={{ border: '1px dashed var(--border-color)', borderRadius: 8, padding: 16, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                    No listings available yet.
-                </div>
-            )}
-
-            <div className="listings-container">
-                    {listings.map((listing) => (
-                        <ListingCard key={listing.id} listing={listing} />
-                    ))}
-            </div>
-        </main>
-    );
+            <Link to="/register" className="listings-btn listings-btn--primary">
+              Donate food
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="listings-container">
+          {listings.map((listing) => (
+            <ListingCard
+              key={listing._id}
+              listing={listing}
+              onUpdate={fetchListings}
+              isDemo={usingDemo}
+            />
+          ))}
+        </div>
+      )}
+    </main>
+  );
 };
 
 export default Listings;
