@@ -66,7 +66,7 @@
 }
 .auth-field input:focus, .auth-field select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(16,185,129,0.10);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.06);
   background: var(--card-bg);
 }
 .auth-submit {
@@ -138,7 +138,7 @@
   font-weight: 700;
   background: var(--border-color);
   color: #94a3b8;
-  transition: all 0.3s;
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 .step-item.active .step-circle {
